@@ -77,6 +77,10 @@ class Controller:
         self.mode = was_mode
         self._log("settings", "Settings updated")
 
+    def note(self, kind, text):
+        """Add a line to the activity feed (used by main.py for voice commands)."""
+        self._log(kind, text)
+
     def _log(self, kind, text):
         import time as _time
         self.log.append({"t": _time.time(), "kind": kind, "text": text})

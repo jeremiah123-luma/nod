@@ -1,0 +1,603 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#000000">
+<title>Nod Command Center</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<style>
+:root {
+  --bg: #000000;
+  --panel: #0a0a0a;
+  --panel-2: #111111;
+  --line: #1c1c1c;
+  --line-2: #2a2a2a;
+  --text: #e0e0e0;
+  --muted: #868686;
+  --dim: #5a5a5a;
+  --accent: #f54a00;
+  --accent-dim: #622a12;
+  --accent-soft: rgba(245, 74, 0, .12);
+  --ok: #3ddc84;
+  --bad: #ff453a;
+  --radius: 16px;
+  --font: "SF Pro Text", "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+  --display: "Helvetica Neue", "Arial Narrow", Arial, sans-serif;
+  --mono: "SF Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); }
+body {
+  font: 14px/1.45 var(--font);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 40px max(16px, env(safe-area-inset-left));
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- top bar ---------- */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; max-width: 1280px; margin: 0 auto 16px; }
+.brand { display: flex; align-items: baseline; gap: 12px; }
+.wm { font: 800 30px/1 var(--display); letter-spacing: -.03em; font-stretch: condensed; }
+.wm b { color: var(--accent); font-weight: 800; }
+.brand .sub { color: var(--muted); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; }
+.pills { display: flex; gap: 8px; flex-wrap: wrap; }
+.pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border: 1px solid var(--line-2); border-radius: 999px; font-size: 12px; color: var(--muted); background: var(--panel); }
+.pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); display: inline-block; }
+.pill.ok i { background: var(--ok); box-shadow: 0 0 0 3px rgba(61, 220, 132, .15); }
+.pill.warn i { background: var(--accent); }
+.pill.bad i { background: var(--bad); }
+.pill b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ---------- grid + tiles ---------- */
+.grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; max-width: 1280px; margin: 0 auto; }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; min-width: 0; position: relative; }
+.tile h2 { margin: 0 0 14px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.s5 { grid-column: span 5; } .s4 { grid-column: span 4; } .s3 { grid-column: span 3; } .s12 { grid-column: span 12; } .s6 { grid-column: span 6; } .s7 { grid-column: span 7; } .s8 { grid-column: span 8; }
+@media (max-width: 1000px) { .s5, .s4, .s3, .s7, .s8 { grid-column: span 6; } }
+@media (max-width: 640px) { .grid > * { grid-column: span 12 !important; } }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; border: 1px solid var(--line-2); color: var(--muted); }
+.chip.ok { color: var(--ok); border-color: rgba(61, 220, 132, .35); }
+.chip.warn { color: var(--accent); border-color: rgba(245, 74, 0, .45); background: var(--accent-soft); }
+.chip.bad { color: var(--bad); border-color: rgba(255, 69, 58, .4); }
+kbd { font: 600 11px var(--mono); padding: 2px 6px; border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 6px; color: var(--text); background: var(--panel-2); white-space: nowrap; }
+
+/* ---------- hero ---------- */
+.hero { display: flex; flex-direction: column; justify-content: space-between; min-height: 230px; overflow: hidden; }
+.hero .word { font: 800 clamp(56px, 9vw, 108px)/.9 var(--display); letter-spacing: -.04em; font-stretch: condensed; margin: 4px 0 10px; text-transform: uppercase; transition: color .2s; }
+.hero[data-mode="POINT"] .word { color: var(--text); }
+.hero[data-mode="SCROLL"] .word { color: var(--accent); }
+.hero[data-mode="PAUSED"] .word { color: var(--dim); }
+.hero .bar { height: 4px; width: 64px; background: var(--accent); border-radius: 2px; margin-bottom: 12px; transition: width .25s, background .2s; }
+.hero[data-mode="PAUSED"] .bar { background: var(--dim); width: 24px; }
+.hero[data-mode="SCROLL"] .bar { width: 120px; }
+.hero p { margin: 0; color: var(--muted); max-width: 42ch; }
+.cheat { list-style: none; margin: 22px 0 0; padding: 0; display: grid; gap: 0; max-width: 360px; }
+.cheat li { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+.cheat .g { color: var(--text); font-weight: 600; }
+.hero .foot { display: flex; gap: 18px; margin-top: 18px; color: var(--muted); font-size: 12px; flex-wrap: wrap; }
+.hero .foot b { color: var(--text); font-weight: 600; }
+
+/* ---------- controls ---------- */
+.btn { border: 1px solid var(--line-2); background: var(--panel-2); border-radius: 12px; padding: 11px 14px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: background .15s, border-color .15s, transform .05s; }
+.btn:hover { border-color: #444; background: #171717; }
+.btn:active { transform: translateY(1px); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #000; font-size: 16px; padding: 15px 18px; width: 100%; }
+.btn.primary:hover { background: #ff5a12; }
+.btn.stop { width: 100%; font-size: 16px; padding: 15px 18px; border-color: var(--line-2); }
+.btn[disabled] { opacity: .45; cursor: not-allowed; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.row > .btn { flex: 1 1 130px; }
+.switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.switch:first-of-type { margin-top: 12px; }
+.switch .t { font-weight: 600; } .switch .d { color: var(--muted); font-size: 12px; }
+.sw { appearance: none; -webkit-appearance: none; width: 44px; height: 26px; border-radius: 999px; background: #222; border: 1px solid var(--line-2); position: relative; flex: none; cursor: pointer; transition: background .15s; }
+.sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: var(--text); transition: transform .15s; }
+.sw:checked { background: var(--accent); border-color: var(--accent); }
+.sw:checked::after { transform: translateX(18px); background: #000; }
+.sw:disabled { opacity: .4; cursor: not-allowed; }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); align-items: center; }
+
+/* ---------- setup checklist ---------- */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.steps li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; padding: 8px 0; align-items: start; }
+.dot { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--line-2); display: grid; place-items: center; font-size: 12px; font-weight: 800; color: #000; margin-top: 1px; }
+li.done .dot { background: var(--ok); border-color: var(--ok); }
+li.next .dot { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+li.unknown .dot { border-style: dashed; }
+.steps .t { font-weight: 600; } .steps .d { color: var(--muted); font-size: 12px; }
+li.done .t { color: var(--muted); font-weight: 500; }
+.setup-done { color: var(--ok); font-weight: 600; }
+.progress { height: 6px; background: #1a1a1a; border-radius: 3px; overflow: hidden; margin-top: 4px; }
+.progress > i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .15s linear; }
+
+/* ---------- meters ---------- */
+.meter { margin-bottom: 18px; }
+.meter:last-child { margin-bottom: 0; }
+.meter .top2 { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; gap: 8px; }
+.meter .name { font-weight: 600; } .meter .val { font: 600 20px var(--display); font-variant-numeric: tabular-nums; }
+.track { position: relative; height: 14px; background: #161616; border-radius: 7px; overflow: visible; }
+.fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--text); border-radius: 7px; width: 0; opacity: .9; transition: background .1s; }
+.fill.hot { background: var(--accent); }
+.mark { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--accent); border-radius: 1px; }
+.mark.soft { background: var(--muted); }
+.mark span { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); font-size: 10px; color: var(--muted); white-space: nowrap; letter-spacing: .04em; }
+.meter .help { color: var(--muted); font-size: 12px; margin-top: 22px; }
+.hold { position: absolute; left: 0; right: 0; bottom: -7px; height: 3px; background: transparent; }
+.hold i { display: block; height: 100%; background: var(--accent); width: 0; border-radius: 2px; }
+.center-track .fill { left: 50%; width: 0; border-radius: 0; }
+
+canvas { display: block; width: 100%; max-width: 100%; background: #050505; border-radius: 10px; border: 1px solid var(--line); }
+.legend { display: flex; gap: 14px; font-size: 11px; color: var(--muted); margin-top: 8px; flex-wrap: wrap; }
+.legend i { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 6px; border-radius: 2px; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+.stat { background: var(--panel-2); border-radius: 10px; padding: 8px 10px; }
+.stat .k { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.stat .v { font: 700 18px var(--display); font-variant-numeric: tabular-nums; }
+
+.empty { color: var(--muted); text-align: center; padding: 26px 8px; }
+.empty b { display: block; color: var(--text); font-size: 15px; margin-bottom: 6px; }
+.note { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--panel-2); font-size: 12px; color: var(--muted); }
+.note b { color: var(--text); }
+.note.ok b { color: var(--ok); } .note.warn b { color: var(--accent); }
+
+/* ---------- activity ---------- */
+.log { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow: auto; }
+.log li { display: grid; grid-template-columns: 64px 10px 1fr; gap: 10px; align-items: center; padding: 7px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.log li:first-child { border-top: 0; }
+.log time { color: var(--muted); font: 11px var(--mono); }
+.log .k { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); }
+.log .k.click, .log .k.jump { background: var(--accent); }
+.log .k.mode { background: var(--text); }
+.log .k.pause { background: var(--bad); }
+.log .k.neutral, .log .k.gaze { background: var(--ok); }
+.log .k.voice, .log .k.settings, .log .k.recenter { background: var(--muted); }
+
+/* ---------- tuning ---------- */
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.tab { border: 1px solid var(--line-2); background: transparent; border-radius: 999px; padding: 7px 14px; font-weight: 600; color: var(--muted); }
+.tab[aria-selected="true"] { background: var(--text); color: #000; border-color: var(--text); }
+.settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 4px 28px; }
+.set { padding: 12px 0; border-top: 1px solid var(--line); }
+.set .hd { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.set .lbl { font-weight: 600; } .set .num { font: 700 16px var(--display); font-variant-numeric: tabular-nums; color: var(--accent); }
+.set .hp { color: var(--muted); font-size: 12px; margin: 2px 0 8px; }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 22px; background: transparent; cursor: pointer; }
+input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--accent) var(--pct, 0%), #222 var(--pct, 0%)); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--text); border: 0; margin-top: -7px; box-shadow: 0 0 0 4px #000; }
+input[type=range]:focus-visible { outline-offset: 4px; }
+.seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: 10px; overflow: hidden; }
+.seg button { border: 0; background: transparent; padding: 7px 14px; color: var(--muted); font-weight: 600; }
+.seg button[aria-pressed="true"] { background: var(--text); color: #000; }
+.tools { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; color: var(--muted); font-size: 12px; }
+.link { background: none; border: 0; color: var(--accent); padding: 0; font-weight: 600; }
+
+/* ---------- misc ---------- */
+.offline { position: sticky; top: 8px; z-index: 20; max-width: 1280px; margin: 0 auto 12px; padding: 12px 16px; background: #1a0b05; border: 1px solid var(--accent-dim); border-radius: 12px; color: var(--text); }
+.offline code { font: 12px var(--mono); color: var(--accent); }
+#toast { position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 20px); background: var(--text); color: #000; padding: 10px 16px; border-radius: 999px; font-weight: 600; opacity: 0; pointer-events: none; transition: .2s; z-index: 30; max-width: 90vw; }
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+#toast.err { background: var(--bad); color: #fff; }
+.privacy { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 12px; margin-top: 10px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div id="offline" class="offline" role="status" hidden>
+  <b>Nod isn't connected.</b> Start it in Terminal with <code>cd ~/nod &amp;&amp; .venv/bin/python -m nod.main</code> &mdash; this page reconnects by itself.
+</div>
+
+<header class="top">
+  <div class="brand"><span class="wm">NO<b>D</b></span><span class="sub">Command Center</span></div>
+  <div class="pills" aria-label="Status">
+    <span class="pill" id="pill-live"><i></i><b id="pill-live-t">Connecting</b></span>
+    <span class="pill" id="pill-face"><i></i><span id="pill-face-t">Camera</span></span>
+    <span class="pill"><span>FPS</span> <b id="pill-fps">--</b></span>
+  </div>
+</header>
+
+<main class="grid">
+
+  <!-- MODE -->
+  <section class="tile hero s5" id="t-mode" data-mode="PAUSED" aria-labelledby="h-mode">
+    <div>
+      <h2 id="h-mode">Mode <span class="chip" id="mode-chip">--</span></h2>
+      <div class="word" id="mode-word" aria-live="polite">Paused</div>
+      <div class="bar"></div>
+      <p id="mode-desc">Waiting for Nod...</p>
+      <ul class="cheat" aria-label="What each gesture does">
+        <li><span class="g">Turn head</span><span>Move the cursor</span></li>
+        <li><span class="g">Open mouth</span><span>Click</span></li>
+        <li><span class="g" id="cheat-toggle">Raise eyebrows</span><span>Switch point / scroll</span></li>
+        <li><span class="g">Look far away</span><span>Cursor jumps there</span></li>
+      </ul>
+    </div>
+    <div class="foot">
+      <span>Cursor <b class="mono" id="cursor-xy">--</b></span>
+      <span>Screen <b class="mono" id="screen-wh">--</b></span>
+    </div>
+  </section>
+
+  <!-- CONTROLS -->
+  <section class="tile s4" aria-labelledby="h-ctl">
+    <h2 id="h-ctl">Controls</h2>
+    <button class="btn primary" id="btn-pause" type="button">Start control</button>
+    <div class="row">
+      <button class="btn" id="btn-recenter" type="button" title="Centers the cursor and re-learns your relaxed face">Recenter</button>
+      <button class="btn" id="btn-calibrate" type="button" title="Look at 18 dots so Nod can learn where you look">Calibrate eyes</button>
+    </div>
+    <label class="switch"><span><span class="t">Eye jump</span><br><span class="d" id="gaze-sw-d">Look far away, cursor jumps there</span></span>
+      <input class="sw" type="checkbox" id="sw-gaze" role="switch"></label>
+    <label class="switch"><span><span class="t">Dwell click</span><br><span class="d">Hold still to click</span></span>
+      <input class="sw" type="checkbox" id="sw-dwell" role="switch"></label>
+    <div class="keys" id="keys"></div>
+  </section>
+
+  <!-- SETUP -->
+  <section class="tile s3" aria-labelledby="h-setup">
+    <h2 id="h-setup">Setup <span class="chip" id="setup-chip">--</span></h2>
+    <ol class="steps" id="steps"></ol>
+  </section>
+
+  <!-- HEAD -->
+  <section class="tile s4" aria-labelledby="h-head">
+    <h2 id="h-head">Head pointer <span class="chip" id="ptr-chip">--</span></h2>
+    <canvas id="cv-hx" data-h="64" aria-label="Left and right head movement, raw and smoothed"></canvas>
+    <div style="height:8px"></div>
+    <canvas id="cv-hy" data-h="64" aria-label="Up and down head movement, raw and smoothed"></canvas>
+    <div class="legend"><span><i style="background:#555"></i>raw (jittery)</span><span><i style="background:var(--accent)"></i>smoothed (what moves the cursor)</span></div>
+    <div class="stats">
+      <div class="stat"><div class="k">Speed</div><div class="v" id="st-speed">0</div></div>
+      <div class="stat"><div class="k">Left/Right</div><div class="v" id="st-hx">0</div></div>
+      <div class="stat"><div class="k">Up/Down</div><div class="v" id="st-hy">0</div></div>
+    </div>
+    <div class="note" id="ptr-note"><b>LOCKED</b> means tiny wobbles are ignored. Move on purpose and it releases.</div>
+  </section>
+
+  <!-- GESTURES -->
+  <section class="tile s4" aria-labelledby="h-ges">
+    <h2 id="h-ges">Face gestures</h2>
+    <div class="meter">
+      <div class="top2"><span class="name">Mouth open <span class="muted small">(click)</span></span><span class="val" id="jaw-val">0.00</span></div>
+      <div class="track"><div class="fill" id="jaw-fill"></div><div class="mark" id="jaw-mark"><span>click</span></div><div class="hold"><i id="jaw-hold"></i></div></div>
+      <div class="help">Open past the orange line and hold. Closing re-arms it.</div>
+    </div>
+    <div class="meter">
+      <div class="top2"><span class="name" id="tg-name">Eyebrows</span><span class="val" id="tg-val">+0.00</span></div>
+      <div class="track"><div class="fill" id="tg-fill"></div><div class="mark soft" id="tg-relaxed"><span>relaxed</span></div><div class="mark" id="tg-mark"><span>toggle</span></div><div class="hold"><i id="tg-hold"></i></div></div>
+      <div class="help" id="tg-help">Raise past the orange line to switch POINT / SCROLL.</div>
+    </div>
+    <div class="note" id="tg-note"><b>--</b></div>
+    <div class="meter" id="scroll-meter" style="margin-top:18px" hidden>
+      <div class="top2"><span class="name">Scrolling</span><span class="val" id="sc-val">0</span></div>
+      <div class="track center-track"><div class="fill hot" id="sc-fill"></div><div class="mark soft" style="left:50%"></div></div>
+      <div class="help">Down = tilt your head down. Lines per second.</div>
+    </div>
+  </section>
+
+  <!-- EYE JUMP -->
+  <section class="tile s4" aria-labelledby="h-gaze">
+    <h2 id="h-gaze">Eye jump <span class="chip" id="gz-chip">--</span></h2>
+    <div id="gz-empty" class="empty" hidden>
+      <b>Not calibrated yet</b>
+      Look at 18 dots for about 35 seconds so Nod learns where you're looking.
+      <div style="margin-top:14px"><button class="btn primary" id="btn-calibrate2" type="button">Calibrate eyes</button></div>
+    </div>
+    <div id="gz-body">
+      <canvas id="cv-gaze" data-h="150" aria-label="Map of your screen showing where you look and where the cursor is"></canvas>
+      <div class="legend"><span><i style="background:var(--text)"></i>where you look</span><span><i style="background:var(--accent)"></i>cursor</span><span><i style="background:#444"></i>jump zone edge</span></div>
+      <div class="note" id="gz-status">--</div>
+      <div class="meter" style="margin:14px 0 0"><div class="top2"><span class="name small">Holding the look</span></div><div class="progress"><i id="gz-prog"></i></div></div>
+      <div class="small muted" id="gz-quality" style="margin-top:10px"></div>
+    </div>
+  </section>
+
+  <!-- MESH -->
+  <section class="tile s3" aria-labelledby="h-mesh">
+    <h2 id="h-mesh">What Nod sees</h2>
+    <canvas id="cv-mesh" data-h="200" aria-label="Wireframe of your face"></canvas>
+    <div class="privacy"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>Only points, never camera pictures. Nothing leaves this computer.</div>
+  </section>
+
+  <!-- ACTIVITY -->
+  <section class="tile s4" aria-labelledby="h-act">
+    <h2 id="h-act">Activity</h2>
+    <ul class="log" id="log" aria-live="off"></ul>
+    <div class="empty" id="log-empty"><b>Nothing yet</b>Clicks, mode changes and eye jumps show up here.</div>
+  </section>
+
+  <!-- TUNING -->
+  <section class="tile s5" aria-labelledby="h-tune">
+    <h2 id="h-tune">Tune it <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:500">changes apply instantly and are saved</span></h2>
+    <div class="tabs" id="tabs" role="tablist"></div>
+    <div class="settings" id="settings"></div>
+    <div class="tools"><span>Tip: watch the meters while you adjust.</span><button class="link" id="btn-undo" type="button">Undo changes since opening</button></div>
+  </section>
+
+</main>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+const TOKEN = "__NOD_TOKEN__";
+const $ = (id) => document.getElementById(id);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+let meta = null, state = null, latest = null, lastMsg = 0, mesh = null;
+let initialValues = {}, settingsByKey = {}, activeTab = null;
+const timers = {};
+
+/* ---------- small helpers ---------- */
+function toast(msg, err) {
+  const t = $("toast"); t.textContent = msg; t.className = "show" + (err ? " err" : "");
+  clearTimeout(toast.h); toast.h = setTimeout(() => (t.className = ""), err ? 3500 : 1600);
+}
+async function api(path, body) {
+  const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json", "X-Nod-Token": TOKEN }, body: JSON.stringify(body) });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || ("HTTP " + r.status));
+  return data;
+}
+const command = (action) => api("/api/command", { action }).catch((e) => toast(e.message, true));
+function prettyKey(combo) {
+  const map = { ctrl: "⌃", alt: "⌥", cmd: "⌘", shift: "⇧" };
+  return combo.split("+").map((p) => { const k = p.replace(/[<>]/g, ""); return map[k] || k.toUpperCase(); }).join("");
+}
+const shapeName = { browInnerUp: "Eyebrows", mouthPucker: "Lip pucker", jawOpen: "Mouth open" };
+const gestureVerb = { browInnerUp: "Raise your eyebrows", mouthPucker: "Pucker your lips" };
+
+/* ---------- canvas plumbing (sharp on retina, resizes with the tile) ---------- */
+const canvases = {};
+function prep(id) {
+  const c = $(id), dpr = window.devicePixelRatio || 1;
+  const w = c.clientWidth, h = +c.dataset.h;                    // logical height (CSS px) lives in data-h
+  c.style.height = h + "px";
+  if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+  const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  return { g, w, h };
+}
+
+function drawTrace(id, trace, iRaw, iSm) {
+  const { g, w, h } = prep(id);
+  g.strokeStyle = "#171717"; g.lineWidth = 1; g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
+  if (!trace || trace.length < 2) return;
+  const sm = trace.map((t) => t[iSm]), raw = trace.map((t) => t[iRaw]);
+  const center = sm.reduce((a, b) => a + b, 0) / sm.length;
+  const span = Math.max(2, ...raw.map((v) => Math.abs(v - center)), ...sm.map((v) => Math.abs(v - center)));
+  const X = (i) => (i / (trace.length - 1)) * w, Y = (v) => h / 2 - ((v - center) / span) * (h / 2 - 4);
+  const line = (arr, color, lw) => { g.strokeStyle = color; g.lineWidth = lw; g.lineJoin = "round"; g.beginPath(); arr.forEach((v, i) => (i ? g.lineTo(X(i), Y(v)) : g.moveTo(X(i), Y(v)))); g.stroke(); };
+  line(raw, "#555", 1);
+  line(sm, "#f54a00", 2.2);
+}
+
+function drawGaze(gz, screen, cursor) {
+  const { g, w } = prep("cv-gaze");
+  const c = $("cv-gaze"), ratio = screen[1] / screen[0], h = Math.round(w * ratio);
+  if (+c.dataset.h !== h) { c.dataset.h = h; return; }          // next frame redraws at the right height
+  const k = w / screen[0], P = (p) => [p[0] * k, p[1] * k];
+  g.strokeStyle = "#161616"; g.lineWidth = 1;
+  for (let i = 1; i < 3; i++) { g.beginPath(); g.moveTo(w * i / 3, 0); g.lineTo(w * i / 3, h); g.moveTo(0, h * i / 3); g.lineTo(w, h * i / 3); g.stroke(); }
+  const [cx, cy] = P(cursor);
+  g.strokeStyle = "#444"; g.setLineDash([4, 4]); g.beginPath(); g.arc(cx, cy, gz.radius * k, 0, 7); g.stroke(); g.setLineDash([]);
+  (gz.trail || []).forEach((p, i, a) => { const [x, y] = P(p); g.fillStyle = `rgba(224,224,224,${0.08 + 0.3 * i / a.length})`; g.beginPath(); g.arc(x, y, 2.5, 0, 7); g.fill(); });
+  if (gz.point) { const [x, y] = P(gz.point); const gr = g.createRadialGradient(x, y, 0, x, y, 16); gr.addColorStop(0, "rgba(224,224,224,.45)"); gr.addColorStop(1, "rgba(224,224,224,0)"); g.fillStyle = gr; g.beginPath(); g.arc(x, y, 16, 0, 7); g.fill(); g.fillStyle = "#e0e0e0"; g.beginPath(); g.arc(x, y, 5, 0, 7); g.fill(); }
+  if (gz.flash) { const [x, y] = P(gz.flash); g.strokeStyle = "#f54a00"; g.lineWidth = 3; g.beginPath(); g.arc(x, y, 14, 0, 7); g.stroke(); }
+  g.strokeStyle = "#f54a00"; g.lineWidth = 2.5; g.beginPath(); g.arc(cx, cy, 6, 0, 7); g.stroke();
+}
+
+function drawMesh(points) {
+  const { g, w, h } = prep("cv-mesh");
+  const c = $("cv-mesh"), th = Math.round(w * 0.82);
+  if (+c.dataset.h !== th) { c.dataset.h = th; return; }
+  if (!points || !mesh) { g.fillStyle = "#555"; g.font = "13px " + getComputedStyle(document.body).fontFamily; g.textAlign = "center"; g.fillText("No face found", w / 2, h / 2); return; }
+  const frameAspect = 4 / 3;                                  // camera frame is 4:3; points are fractions of it
+  const fw = Math.min(w, h * frameAspect), fh = fw / frameAspect, ox = (w - fw) / 2, oy = (h - fh) / 2;
+  const pt = (i) => [ox + points[2 * i] / 1000 * fw, oy + points[2 * i + 1] / 1000 * fh];
+  const style = { oval: ["#6a6a6a", 1.4], brows: ["#e0e0e0", 1.6], eyes: ["#e0e0e0", 1.4], lips: ["#e0e0e0", 1.4], nose: ["#3a3a3a", 1], irises: ["#f54a00", 2] };
+  for (const [name, pairs] of Object.entries(mesh.groups)) {
+    const [col, lw] = style[name] || ["#555", 1]; g.strokeStyle = col; g.lineWidth = lw; g.beginPath();
+    for (const [a, b] of pairs) { const p = pt(a), q = pt(b); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); }
+    g.stroke();
+  }
+}
+
+/* ---------- rendering the state ---------- */
+const MODE_TEXT = {
+  POINT: () => "Turn your head to move the cursor. Open your mouth to click.",
+  SCROLL: (s) => `Tilt your head down to scroll down, up to scroll up. ${gestureVerb[s.toggle.shape] || "Make the toggle gesture"} to go back to pointing.`,
+  PAUSED: () => "Nod is not touching your mouse. Press Start control when you're ready.",
+};
+function setNote(el, label, text) {              // bold label + plain text, built with textContent (never innerHTML)
+  el.textContent = "";
+  const b = document.createElement("b"); b.textContent = label;
+  el.append(b, document.createTextNode(text ? " — " + text : ""));
+}
+function setMeter(fillId, value, marks) {
+  $(fillId).style.width = clamp(value, 0, 1) * 100 + "%";
+  for (const [id, v] of marks) $(id).style.left = clamp(v, 0, 1) * 100 + "%";
+}
+
+function renderSetup(s) {
+  const p = s.perms || {};
+  const items = [
+    { t: "Camera sees you", d: s.face ? "Looking good." : "Sit in front of the camera, with light on your face.", done: s.face },
+    { t: "Learned your relaxed face", d: s.neutral.ready ? "Done. Press Recenter any time you change posture." : `Hold a relaxed face... ${Math.round(s.neutral.progress * 100)}%`, done: s.neutral.ready },
+    { t: "Hotkeys work everywhere", d: p.input_monitoring === false ? "Turn on Input Monitoring for your terminal app (System Settings → Privacy & Security), then restart it." : "Pause / recenter from any app.", done: p.input_monitoring !== false, unknown: p.input_monitoring == null },
+    { t: "Allowed to control the mouse", d: p.accessibility === false ? "Turn on Accessibility for your terminal app (System Settings → Privacy & Security), then restart it." : "macOS says yes.", done: p.accessibility !== false, unknown: p.accessibility == null },
+    { t: "Eyes calibrated", d: s.gaze.calibrated ? `Error about ${s.gaze.error_pct}% of the screen.` : "Optional. Press Calibrate eyes (35 s).", done: s.gaze.calibrated },
+    { t: "Control is live", d: s.paused ? "Press Start control when you're ready." : "You're in control.", done: !s.paused },
+  ];
+  const firstOpen = items.findIndex((i) => !i.done);
+  const ul = $("steps"); const sig = JSON.stringify(items.map((i) => [i.done, i.d]));
+  if (renderSetup.sig !== sig) {
+    renderSetup.sig = sig; ul.textContent = "";
+    items.forEach((it, i) => {
+      const li = document.createElement("li"); li.className = (it.done ? "done" : i === firstOpen ? "next" : "") + (it.unknown ? " unknown" : "");
+      const dot = document.createElement("span"); dot.className = "dot"; dot.textContent = it.done ? "✓" : "";
+      const box = document.createElement("div"); const t = document.createElement("div"); t.className = "t"; t.textContent = it.t;
+      const d = document.createElement("div"); d.className = "d"; d.textContent = it.d; box.append(t, d); li.append(dot, box); ul.append(li);
+    });
+  }
+  const n = items.filter((i) => i.done).length;
+  const chip = $("setup-chip"); chip.textContent = n === items.length ? "All set" : `${n}/${items.length}`; chip.className = "chip " + (n === items.length ? "ok" : "warn");
+}
+
+function renderLog(entries) {
+  const sig = entries.length ? entries[entries.length - 1].t + ":" + entries.length : "";
+  if (renderLog.sig === sig) return; renderLog.sig = sig;
+  const ul = $("log"); ul.textContent = "";
+  $("log-empty").hidden = entries.length > 0;
+  [...entries].reverse().forEach((e) => {
+    const li = document.createElement("li"); const tm = document.createElement("time");
+    tm.textContent = new Date(e.t * 1000).toLocaleTimeString([], { hour12: false });
+    const k = document.createElement("span"); k.className = "k " + e.kind; const tx = document.createElement("span"); tx.textContent = e.text;
+    li.append(tm, k, tx); ul.append(li);
+  });
+}
+
+function render(s) {
+  state = s;
+  // header pills
+  const live = $("pill-live"); live.className = "pill " + (s.paused ? "warn" : "ok"); $("pill-live-t").textContent = s.paused ? "Paused" : "Live";
+  $("pill-face").className = "pill " + (s.face ? "ok" : "bad"); $("pill-face-t").textContent = s.face ? "Face found" : "No face";
+  $("pill-fps").textContent = s.fps ? Math.round(s.fps) : "--";
+  document.title = `${s.mode} · Nod`;
+
+  // mode hero
+  const hero = $("t-mode"); hero.dataset.mode = s.mode;
+  $("mode-word").textContent = s.mode; $("mode-chip").textContent = s.paused ? "mouse off" : "mouse on"; $("mode-chip").className = "chip " + (s.paused ? "" : "ok");
+  $("mode-desc").textContent = (MODE_TEXT[s.mode] || MODE_TEXT.POINT)(s);
+  $("cheat-toggle").textContent = gestureVerb[s.toggle.shape] ? gestureVerb[s.toggle.shape].replace("Raise your", "Raise").replace("Pucker your", "Pucker") : "Toggle gesture";
+  $("cursor-xy").textContent = `${s.cursor[0]}, ${s.cursor[1]}`; $("screen-wh").textContent = `${s.screen[0]}×${s.screen[1]}`;
+
+  // controls
+  const bp = $("btn-pause");
+  bp.className = "btn " + (s.paused ? "primary" : "stop"); bp.textContent = s.paused ? "Start control" : "Pause control"; bp.setAttribute("aria-pressed", String(!s.paused));
+  $("sw-gaze").checked = s.gaze.enabled; $("sw-gaze").disabled = !s.gaze.calibrated;
+  $("gaze-sw-d").textContent = s.gaze.calibrated ? "Look far away, cursor jumps there" : "Calibrate eyes first";
+  $("sw-dwell").checked = s.dwell.enabled;
+
+  renderSetup(s);
+
+  // head
+  drawTrace("cv-hx", s.trace, 0, 1); drawTrace("cv-hy", s.trace, 2, 3);
+  const pc = $("ptr-chip"); pc.textContent = s.pointer.state; pc.className = "chip " + (s.pointer.state === "MOVING" ? "warn" : "ok");
+  $("st-speed").textContent = s.pointer.speed; $("st-hx").textContent = s.pointer.smooth[0].toFixed(1); $("st-hy").textContent = s.pointer.smooth[1].toFixed(1);
+  setNote($("ptr-note"), s.pointer.state, s.pointer.state === "LOCKED" ? "tiny wobbles are ignored, so the cursor stays put." : "the cursor follows your head. It locks again when you hold still.");
+
+  // gestures
+  const jaw = s.click; setMeter("jaw-fill", jaw.value, [["jaw-mark", jaw.threshold]]);
+  $("jaw-fill").className = "fill" + (jaw.value >= jaw.threshold ? " hot" : ""); $("jaw-val").textContent = jaw.value.toFixed(2); $("jaw-hold").style.width = jaw.progress * 100 + "%";
+  const tg = s.toggle, name = shapeName[tg.shape] || tg.shape;
+  $("tg-name").textContent = name + " (switches scroll mode)"; $("tg-val").textContent = (tg.rise >= 0 ? "+" : "") + tg.rise.toFixed(2);
+  setMeter("tg-fill", tg.value, [["tg-relaxed", tg.relaxed], ["tg-mark", tg.relaxed + tg.need]]);
+  $("tg-fill").className = "fill" + (tg.rise >= tg.need ? " hot" : ""); $("tg-hold").style.width = tg.progress * 100 + "%";
+  $("tg-help").textContent = `${gestureVerb[tg.shape] || "Do the gesture"} past the orange line, with your head level and still.`;
+  const ready = !s.paused && tg.note === "ready"; const tn = $("tg-note"); tn.className = "note " + (ready ? "ok" : "warn");
+  const label = s.paused ? "Paused" : ready ? "Ready" : tg.note.startsWith("blocked") ? "Blocked" : "Wait";
+  const why = s.paused ? "press Start control to use gestures." : ready ? "toggle is armed." : tg.note.replace(/^blocked: /, "");
+  setNote(tn, label, why);
+  $("scroll-meter").hidden = !s.scroll.active; if (s.scroll.active) { const r = s.scroll.rate; $("sc-val").textContent = r.toFixed(0); const f = $("sc-fill"), pct = clamp(Math.abs(r) / 30, 0, 1) * 50; f.style.left = r >= 0 ? "50%" : (50 - pct) + "%"; f.style.width = pct + "%"; }
+
+  // eye jump
+  const gz = s.gaze; $("gz-empty").hidden = gz.calibrated; $("gz-body").hidden = !gz.calibrated;
+  const gc = $("gz-chip");
+  if (!gz.calibrated) { gc.textContent = "not set up"; gc.className = "chip warn"; }
+  else { gc.textContent = gz.enabled ? "on" : "off"; gc.className = "chip " + (gz.enabled ? "ok" : ""); drawGaze(gz, s.screen, s.cursor); }
+  if (gz.calibrated) {
+    setNote($("gz-status"), gz.status.startsWith("JUMPED") ? "Jumped" : "Status", gz.status);
+    $("gz-prog").style.width = gz.progress * 100 + "%";
+    const pct = gz.error_pct, v = pct <= 8 ? "Good" : pct <= 13 ? "OK" : "Poor — recalibrate for better jumps";
+    $("gz-quality").textContent = `Calibration: ${v} · ~${gz.error_pct}% error · ${gz.model}`;
+  }
+
+  drawMesh(s.mesh); renderLog(s.log || []);
+}
+
+/* ---------- tuning panel ---------- */
+function fmt(spec, v) {
+  if (spec.kind === "int") return String(v);
+  const dec = (String(spec.step).split(".")[1] || "").length; return Number(v).toFixed(dec);
+}
+function buildTuning() {
+  const groups = [...new Set(meta.settings.map((s) => s.group))];
+  activeTab = activeTab || groups[0];
+  const tabs = $("tabs"); tabs.textContent = "";
+  groups.forEach((gname) => {
+    const b = document.createElement("button"); b.className = "tab"; b.type = "button"; b.role = "tab"; b.textContent = gname; b.setAttribute("aria-selected", String(gname === activeTab));
+    b.onclick = () => { activeTab = gname; buildTuning(); }; tabs.append(b);
+  });
+  const box = $("settings"); box.textContent = "";
+  meta.settings.filter((s) => s.group === activeTab).forEach((spec) => box.append(settingRow(spec)));
+}
+function settingRow(spec) {
+  const row = document.createElement("div"); row.className = "set";
+  const hd = document.createElement("div"); hd.className = "hd";
+  const lbl = document.createElement("span"); lbl.className = "lbl"; lbl.textContent = spec.label;
+  const num = document.createElement("span"); num.className = "num"; hd.append(lbl, num);
+  const hp = document.createElement("div"); hp.className = "hp"; hp.textContent = spec.help; row.append(hd, hp);
+  const set = (value) => {
+    settingsByKey[spec.key].value = value; clearTimeout(timers[spec.key]);
+    timers[spec.key] = setTimeout(() => api("/api/settings", { changes: { [spec.key]: value } }).then(() => toast("Saved")).catch((e) => { toast(e.message, true); const old = initialValues[spec.key]; settingsByKey[spec.key].value = old; buildTuning(); }), 250);
+  };
+  if (spec.kind === "bool") {
+    num.textContent = spec.value ? "On" : "Off";
+    const cb = document.createElement("input"); cb.type = "checkbox"; cb.className = "sw"; cb.role = "switch"; cb.checked = !!spec.value; cb.setAttribute("aria-label", spec.label);
+    cb.onchange = () => { num.textContent = cb.checked ? "On" : "Off"; set(cb.checked); }; row.append(cb);
+  } else if (spec.kind === "choice") {
+    num.textContent = spec.value; const seg = document.createElement("div"); seg.className = "seg";
+    spec.options.forEach((o) => { const b = document.createElement("button"); b.type = "button"; b.textContent = o; b.setAttribute("aria-pressed", String(o === spec.value)); b.onclick = () => { set(o); spec.value = o; buildTuning(); }; seg.append(b); }); row.append(seg);
+  } else {
+    const r = document.createElement("input"); r.type = "range"; r.min = spec.min; r.max = spec.max; r.step = spec.step; r.value = spec.value; r.setAttribute("aria-label", spec.label);
+    const paint = () => { num.textContent = fmt(spec, r.value) + (spec.unit ? " " + spec.unit : ""); r.style.setProperty("--pct", ((r.value - spec.min) / (spec.max - spec.min)) * 100 + "%"); };
+    paint(); r.oninput = () => { paint(); set(spec.kind === "int" ? Math.round(+r.value) : +r.value); }; row.append(r);
+  }
+  return row;
+}
+$("btn-undo").onclick = async () => {
+  const changes = {}; meta.settings.forEach((s) => { if (JSON.stringify(s.value) !== JSON.stringify(initialValues[s.key])) changes[s.key] = initialValues[s.key]; });
+  if (!Object.keys(changes).length) return toast("Nothing to undo");
+  try { const r = await api("/api/settings", { changes }); meta.settings = r.settings; r.settings.forEach((s) => (settingsByKey[s.key] = s)); buildTuning(); toast("Back to how it was"); } catch (e) { toast(e.message, true); }
+};
+
+/* ---------- wiring ---------- */
+$("btn-pause").onclick = () => command(state && state.paused ? "resume" : "pause");
+$("btn-recenter").onclick = () => command("recenter").then(() => toast("Recentered. Hold a relaxed face for a moment."));
+const cal = () => { toast("Look at the dots on your screen (ESC cancels)"); command("calibrate"); };
+$("btn-calibrate").onclick = cal; $("btn-calibrate2").onclick = cal;
+$("sw-gaze").onchange = () => command("toggle_gaze"); $("sw-dwell").onchange = () => command("toggle_dwell");
+document.addEventListener("keydown", (e) => { if (e.target.matches("input,textarea")) return; if (e.key === " " && e.target === document.body) { e.preventDefault(); command(state && state.paused ? "resume" : "pause"); } });
+
+function connect() {
+  const es = new EventSource("/events?t=" + encodeURIComponent(TOKEN));
+  es.onopen = () => { $("offline").hidden = true; };
+  es.onmessage = (e) => { lastMsg = performance.now(); latest = JSON.parse(e.data); document.title = `${latest.mode} · Nod`; };   // title updates even in a background tab
+  es.onerror = () => { setTimeout(() => { if (performance.now() - lastMsg > 2500) $("offline").hidden = false; }, 2600); };
+}
+function frame() { if (latest) { const s = latest; latest = null; if (meta) render(s); } requestAnimationFrame(frame); }
+setInterval(() => { if (lastMsg && performance.now() - lastMsg > 3500) $("offline").hidden = false; else if (lastMsg) $("offline").hidden = true; }, 1000);
+
+(async function init() {
+  try {
+    const r = await fetch("/api/meta?t=" + encodeURIComponent(TOKEN)); meta = await r.json();
+  } catch (e) { $("offline").hidden = false; setTimeout(init, 2000); return; }
+  mesh = meta.mesh || null;
+  meta.settings.forEach((s) => { settingsByKey[s.key] = s; initialValues[s.key] = s.value; });
+  $("keys").textContent = "";
+  const labels = { pause: "Pause / resume", recenter: "Recenter", calibrate: "Calibrate eyes", gaze_toggle: "Eye jump on/off", dwell_toggle: "Dwell click", voice_toggle: "Voice", quit: "Quit" };
+  Object.entries(meta.hotkeys).forEach(([k, v]) => { if (!labels[k]) return; const kb = document.createElement("kbd"); kb.textContent = prettyKey(v); const sp = document.createElement("span"); sp.textContent = labels[k]; $("keys").append(kb, sp); });
+  buildTuning(); connect(); requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

@@ -98,5 +98,11 @@
     "language": "en",
     "max_seconds": 8,
     "scroll_clicks": 10
+  },
+  "ui": {
+    "dashboard": true,
+    "port": 8765,
+    "auto_open": true,
+    "preview_window": true
   }
 }
