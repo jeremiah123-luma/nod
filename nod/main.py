@@ -1,56 +1,83 @@
-"""M0: webcam preview with face landmarks and FPS. Press q to quit."""
+"""Nod: hands-free computer control. Run with:  .venv/bin/python -m nod.main
+
+Add --dry-run to print what the mouse WOULD do without touching it.
+Global hotkeys (work from any app): ctrl+alt+p pause/resume, ctrl+alt+c recenter, ctrl+alt+q quit.
+"""
+import argparse
+import queue
 import time
 
 import cv2
-from mediapipe.tasks.python import vision
 
+from nod import actions, hotkeys
 from nod.camera import Camera
+from nod.config import load_config
+from nod.controller import Controller
 from nod.face import FaceTracker
-
-WINDOW = "Nod (press q to quit)"
-CONNECTIONS = vision.FaceLandmarksConnections
-
-
-def draw_face(frame, landmarks):
-    """Draw the face mesh. Landmarks are 0..1 fractions, so scale by frame size."""
-    h, w = frame.shape[:2]
-    pts = [(int(p.x * w), int(p.y * h)) for p in landmarks]
-    for c in CONNECTIONS.FACE_LANDMARKS_TESSELATION:
-        cv2.line(frame, pts[c.start], pts[c.end], (90, 90, 90), 1, cv2.LINE_AA)
-    for group in (CONNECTIONS.FACE_LANDMARKS_CONTOURS,):
-        for c in group:
-            cv2.line(frame, pts[c.start], pts[c.end], (0, 255, 160), 1, cv2.LINE_AA)
+from nod.hud import draw_hud, draw_mesh
 
 
 def main():
-    camera = Camera()
-    tracker = FaceTracker()
-    fps, last = 0.0, time.monotonic()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dry-run", action="store_true", help="print mouse actions instead of doing them")
+    args = parser.parse_args()
 
+    cfg = load_config()
+    actions.set_dry_run(args.dry_run)
+    camera = Camera(cfg["camera"]["index"], cfg["camera"]["width"], cfg["camera"]["height"])
+    aspect = cfg["camera"]["width"] / cfg["camera"]["height"]
+    tracker = FaceTracker()
+    controller = Controller(cfg, actions)
+    listener = hotkeys.start(cfg)
+    window = cfg["hud"]["window_name"]
+
+    print("Nod is running. ctrl+alt+p = pause/resume, ctrl+alt+c = recenter, ctrl+alt+q = quit.")
+    print("Emergency stop: slam the real mouse into the top-left corner of the screen.")
+    actions.set_paused(True)  # start paused so nothing moves until you press ctrl+alt+p
+    print("Started PAUSED. Press ctrl+alt+p when you're ready.")
+
+    fps, last = 0.0, time.monotonic()
     try:
         while True:
             frame = camera.read()
             if frame is None:
                 continue
-
-            result = tracker.process(frame)
-            if result.face_landmarks:
-                draw_face(frame, result.face_landmarks[0])
-                status = "face found"
-            else:
-                status = "no face"
-
-            # Smoothed FPS so the number doesn't flicker.
             now = time.monotonic()
+            result = tracker.process(frame)
+            face = tracker.analyze(result, aspect)
+
+            try:
+                controller.update(face, now)
+            except actions.FailSafeTriggered:
+                print("Failsafe triggered (mouse in the corner). Stopping.")
+                break
+
+            if face is not None:
+                draw_mesh(frame, face.landmarks)
             fps = 0.9 * fps + 0.1 * (1.0 / max(now - last, 1e-6))
             last = now
-            cv2.putText(frame, f"FPS {fps:.0f}  |  {status}", (10, 28),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
+            draw_hud(frame, controller.hud_info(), fps, face is not None)
+            cv2.imshow(window, frame)
 
-            cv2.imshow(WINDOW, frame)
-            if cv2.waitKey(1) & 0xFF == ord("q"):
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord("q"):
                 break
+            if key == ord("c"):
+                controller.recenter()
+            try:
+                while True:
+                    event = hotkeys.events.get_nowait()
+                    if event == "quit":
+                        raise KeyboardInterrupt
+                    if event == "recenter":
+                        controller.recenter()
+            except queue.Empty:
+                pass
+    except KeyboardInterrupt:
+        pass
     finally:
+        if listener:
+            listener.stop()
         tracker.close()
         camera.release()
         cv2.destroyAllWindows()

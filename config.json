@@ -1,0 +1,27 @@
+{
+  "camera": {
+    "index": 0,
+    "width": 640,
+    "height": 480
+  },
+  "pointer": {
+    "gain_x": 70,
+    "gain_y": 60,
+    "invert_x": false,
+    "invert_y": false,
+    "acceleration": 0.3,
+    "deadzone_px": 0.3,
+    "edge_margin_px": 1,
+    "filter_min_cutoff": 1.0,
+    "filter_beta": 0.05,
+    "filter_d_cutoff": 1.0
+  },
+  "hotkeys": {
+    "pause": "<ctrl>+<alt>+p",
+    "recenter": "<ctrl>+<alt>+c",
+    "quit": "<ctrl>+<alt>+q"
+  },
+  "hud": {
+    "window_name": "Nod (q = quit, c = recenter)"
+  }
+}
