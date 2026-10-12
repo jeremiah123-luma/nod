@@ -87,8 +87,8 @@ if __name__ == "__main__":
     from nod.face import FaceTracker
 
     cfg = load_config()
-    cam = Camera(cfg["camera"]["index"], cfg["camera"]["width"], cfg["camera"]["height"])
-    trk = FaceTracker()
+    cam = Camera(cfg["camera"]["index"], cfg["camera"]["width"], cfg["camera"]["height"], cfg["camera"]["fps"])
+    trk = FaceTracker(cfg)
     try:
         run_calibration(cam, trk, cfg["camera"]["width"] / cfg["camera"]["height"], cfg)
     finally:

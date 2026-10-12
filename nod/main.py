@@ -31,9 +31,9 @@ def main():
 
     cfg = load_config()
     actions.set_dry_run(args.dry_run)
-    camera = Camera(cfg["camera"]["index"], cfg["camera"]["width"], cfg["camera"]["height"])
+    camera = Camera(cfg["camera"]["index"], cfg["camera"]["width"], cfg["camera"]["height"], cfg["camera"]["fps"])
     aspect = cfg["camera"]["width"] / cfg["camera"]["height"]
-    tracker = FaceTracker()
+    tracker = FaceTracker(cfg)
     mapper = GazeMapper.load(CAL_PATH, actions.screen_size())
     controller = Controller(cfg, actions, mapper)
     print("Eye jump:", f"calibrated (error ~{mapper.error_px:.0f}px)" if mapper else "not calibrated yet. Press k in the preview window.")

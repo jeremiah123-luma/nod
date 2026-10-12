@@ -4,6 +4,7 @@ It talks to the mouse ONLY through the `actions` object it is given, so tests ca
 a fake one and check what it would have done without touching the real mouse.
 """
 import math
+from collections import deque
 
 from nod.gaze import GazeJump, GazeTracker, is_blinking
 from nod.gestures import DwellClick, HoldTrigger
@@ -41,6 +42,7 @@ class Controller:
         self.scroll_rate = 0.0
         self._was_paused = False
         self.debug = {}
+        self.trace = deque(maxlen=120)   # recent (raw_x, smooth_x, raw_y, smooth_y), drawn on the HUD
 
     # ---- helpers ----
     def _clamp(self):
@@ -139,7 +141,25 @@ class Controller:
 
     # ---- the main step, called once per camera frame ----
     def update(self, face, now):
-        if self.actions.is_paused():
+        paused = self.actions.is_paused()
+        if face is None:
+            self.pointer.reset()  # avoid a jump when the face comes back
+            self._reset_gestures()
+            self._scroll_neutral = None
+            self._scroll_last_t = None
+            self.debug = {}
+            self._was_paused = self._was_paused or paused
+            return
+
+        # The pointer filter always runs, even while paused, so the HUD can show raw vs smoothed.
+        # It only MOVES the cursor when we're not paused (below).
+        dx, dy, speed = self.pointer.update(face.head_x, face.head_y, now)
+        self.trace.append((*self.pointer.raw[:1], self.pointer.filtered[0], self.pointer.raw[1], self.pointer.filtered[1]))
+        jaw = face.blend.get(self.click_shape, 0.0)
+        brow = face.blend.get(self.scroll_cfg["toggle_blendshape"], 0.0)
+        self.debug = {"head_x": face.head_x, "head_y": face.head_y, "jaw": jaw, "brow": brow, "speed": speed}
+
+        if paused:
             self._was_paused = True
             return
         if self._was_paused:
@@ -148,19 +168,7 @@ class Controller:
             self.cursor = list(self.actions.position())
             self.pointer.reset()
             self._reset_gestures()
-
-        if face is None:
-            self.pointer.reset()  # avoid a jump when the face comes back
-            self._reset_gestures()
-            self._scroll_neutral = None
-            self._scroll_last_t = None
-            self.debug = {}
             return
-
-        dx, dy, speed = self.pointer.update(face.head_x, face.head_y, now)
-        jaw = face.blend.get(self.click_shape, 0.0)
-        brow = face.blend.get(self.scroll_cfg["toggle_blendshape"], 0.0)
-        self.debug = {"head_x": face.head_x, "head_y": face.head_y, "jaw": jaw, "brow": brow}
 
         # Eyebrow raise (held briefly) flips between POINT and SCROLL.
         if self.mode_trigger.update(brow, now):
@@ -198,7 +206,9 @@ class Controller:
 
     # ---- what the HUD should show ----
     def hud_info(self):
-        lines = [f"head x {self.debug.get('head_x', 0):+6.1f}   y {self.debug.get('head_y', 0):+6.1f}",
+        raw, sm = self.pointer.raw or (0, 0), self.pointer.filtered or (0, 0)
+        lines = [f"head RAW    x {raw[0]:+7.2f}  y {raw[1]:+7.2f}",
+                 f"head SMOOTH x {sm[0]:+7.2f}  y {sm[1]:+7.2f}   pointer {self.pointer.state}  {self.pointer.speed_px:4.0f}px/s",
                  f"{self.click_shape} {self.debug.get('jaw', 0):.2f}  (click at {self.click_trigger.threshold})",
                  f"{self.scroll_cfg['toggle_blendshape']} {self.debug.get('brow', 0):.2f}  (toggle at {self.mode_trigger.threshold})"]
         if self.mode == "SCROLL":
@@ -215,4 +225,4 @@ class Controller:
             lines.append("eye jump: OFF")
         if self.dwell_enabled:
             bars.append(("dwell", self.dwell.progress, (200, 200, 60)))
-        return {"mode": self.display_mode, "lines": lines, "bars": bars}
+        return {"mode": self.display_mode, "lines": lines, "bars": bars, "trace": list(self.trace)}

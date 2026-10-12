@@ -2,7 +2,7 @@
 import math
 from types import SimpleNamespace
 
-from nod.face import FaceData
+from nod.face import NOSE_POINTS, FaceData
 
 
 def make_landmarks(yaw=0.0, pitch=0.0, roll_deg=0.0, jaw=0.0):
@@ -15,12 +15,16 @@ def make_landmarks(yaw=0.0, pitch=0.0, roll_deg=0.0, jaw=0.0):
     eye_half = 0.1
     lm[33] = SimpleNamespace(x=0.5 - eye_half, y=0.4, z=0.0)
     lm[263] = SimpleNamespace(x=0.5 + eye_half, y=0.4, z=0.0)
+    lm[133] = SimpleNamespace(x=lm[33].x, y=0.4, z=0.0)     # inner corners: same spot, so eye centers = outer corners
+    lm[362] = SimpleNamespace(x=lm[263].x, y=0.4, z=0.0)
     eye_dist = 2 * eye_half
-    lm[1] = SimpleNamespace(x=0.5 + yaw * eye_dist, y=0.4 + (0.6 + pitch) * eye_dist, z=0.0)
+    nose = SimpleNamespace(x=0.5 + yaw * eye_dist, y=0.4 + (0.6 + pitch) * eye_dist, z=0.0)
+    for i in NOSE_POINTS:                                    # every nose point sits at the nose position
+        lm[i] = SimpleNamespace(x=nose.x, y=nose.y, z=0.0)
     lm[152] = SimpleNamespace(x=0.5, y=0.75 + jaw * 0.1, z=0.0)  # chin
     if roll_deg:
         r = math.radians(roll_deg)
-        for i in (33, 263, 1, 152):
+        for i in (33, 133, 362, 263, 152, *NOSE_POINTS):
             p = lm[i]
             dx, dy = p.x - 0.5, p.y - 0.5
             lm[i] = SimpleNamespace(x=0.5 + dx * math.cos(r) - dy * math.sin(r),

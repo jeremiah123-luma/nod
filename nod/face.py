@@ -6,13 +6,17 @@ from pathlib import Path
 
 import cv2
 import mediapipe as mp
+import numpy as np
 from mediapipe.tasks.python import BaseOptions, vision
 
 MODEL_PATH = Path(__file__).resolve().parent.parent / "models" / "face_landmarker.task"
 
 # Landmark numbers in MediaPipe's 478-point face mesh.
 NOSE_TIP = 1
-EYE_OUTER_A, EYE_OUTER_B = 33, 263  # outer corners of the two eyes
+# Several points down the nose and on both nostril wings. Averaging them cancels some of the
+# per-point wobble that a single nose-tip landmark has.
+NOSE_POINTS = [1, 2, 4, 5, 6, 195, 197, 98, 327, 129, 358]
+LEFT_EYE_CORNERS, RIGHT_EYE_CORNERS = (33, 133), (362, 263)
 # Per eye: (iris center, corner, corner, upper lid, lower lid)
 EYES = [(468, 33, 133, 159, 145), (473, 362, 263, 386, 374)]
 
@@ -29,28 +33,48 @@ class FaceData:
 
 
 def compute_head_signals(lm, aspect=1.0):
-    """Head turn/tilt from landmarks, in 'eye-distance percent' units.
+    """Head turn/tilt from landmarks, in 'eye-distance percent' units (the fallback signal).
 
-    We measure where the nose tip sits relative to the midpoint between the eyes,
-    along the eye line (head_x) and across it (head_y). That's:
+    We measure where the average of several nose points sits relative to the midpoint between
+    the eyes, along the eye line (head_x) and across it (head_y). That's:
     - independent of how far you sit from the camera (divided by eye distance)
     - independent of head roll (we measure along the eye line, not the screen axes)
     - independent of mouth opening (we don't use the jaw at all)
     `aspect` = frame width / height, because landmark x and y are in different units.
     """
-    a, b = lm[EYE_OUTER_A], lm[EYE_OUTER_B]
-    if a.x > b.x:
+    def center(idx):
+        return (sum(lm[i].x for i in idx) / len(idx) * aspect, sum(lm[i].y for i in idx) / len(idx))
+
+    a, b = center(LEFT_EYE_CORNERS), center(RIGHT_EYE_CORNERS)
+    if a[0] > b[0]:
         a, b = b, a
-    ex, ey = (b.x - a.x) * aspect, (b.y - a.y)
+    ex, ey = b[0] - a[0], b[1] - a[1]
     dist = math.hypot(ex, ey)
     if dist < 1e-6:
         return 0.0, 0.0
     ux, uy = ex / dist, ey / dist          # unit vector along the eye line
     px, py = -uy, ux                        # perpendicular, pointing "down" the face
-    nose = lm[NOSE_TIP]
-    ox = nose.x * aspect - (a.x + b.x) / 2 * aspect
-    oy = nose.y - (a.y + b.y) / 2
+    nx, ny = center(NOSE_POINTS)
+    ox, oy = nx - (a[0] + b[0]) / 2, ny - (a[1] + b[1]) / 2
     return 100.0 * (ox * ux + oy * uy) / dist, 100.0 * (ox * px + oy * py) / dist
+
+
+def matrix_head_signals(matrix, units_per_sin=45.0):
+    """Head turn/tilt from MediaPipe's face transformation matrix (much steadier than landmarks).
+
+    The matrix is MediaPipe's best fit of a 3D face model to ALL the landmarks at once, so
+    single-point wobble averages out. We ask: where does the face's "nose direction" point?
+    - pointing toward image-right  -> head_x grows   (turning right)
+    - pointing down                -> head_y grows   (tilting down)
+    Signs were checked against the landmark signal on a real camera (correlation +0.98 / +0.79).
+    """
+    rot = np.asarray(matrix, dtype=float)[:3, :3]
+    det = np.linalg.det(rot)
+    if det <= 1e-9:
+        return None
+    rot = rot / np.cbrt(det)                       # strip any scale, keep the rotation
+    forward = rot @ np.array([0.0, 0.0, 1.0])      # canonical face looks along +z
+    return units_per_sin * forward[0], -units_per_sin * forward[1]   # matrix y points UP, screen y points down
 
 
 def compute_gaze_features(lm, aspect=1.0):
@@ -80,7 +104,10 @@ def analyze_landmarks(landmarks, blend, aspect=1.0):
 
 
 class FaceTracker:
-    def __init__(self):
+    def __init__(self, cfg=None):
+        p = (cfg or {}).get("pointer", {})
+        self.source = p.get("source", "matrix")          # "matrix" or "landmarks"
+        self.units_per_sin = p.get("matrix_units_per_sin", 45.0)
         if not MODEL_PATH.exists():
             raise FileNotFoundError(f"Model not found at {MODEL_PATH}. See README.")
         options = vision.FaceLandmarkerOptions(
@@ -89,7 +116,7 @@ class FaceTracker:
             running_mode=vision.RunningMode.VIDEO,
             num_faces=1,
             output_face_blendshapes=True,                  # jawOpen, browInnerUp, ...
-            output_facial_transformation_matrixes=False,   # we measure head pose from landmarks instead
+            output_facial_transformation_matrixes=True,    # head pose: the steadiest signal for the pointer
         )
         self.landmarker = vision.FaceLandmarker.create_from_options(options)
         self._start = time.monotonic()
@@ -106,7 +133,12 @@ class FaceTracker:
         if not result.face_landmarks:
             return None
         blend = {c.category_name: c.score for c in result.face_blendshapes[0]} if result.face_blendshapes else {}
-        return analyze_landmarks(result.face_landmarks[0], blend, aspect)
+        data = analyze_landmarks(result.face_landmarks[0], blend, aspect)
+        if self.source == "matrix" and result.facial_transformation_matrixes:
+            sig = matrix_head_signals(result.facial_transformation_matrixes[0], self.units_per_sin)
+            if sig:
+                data.head_x, data.head_y = sig
+        return data
 
     def close(self):
         self.landmarker.close()
