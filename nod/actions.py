@@ -98,3 +98,14 @@ def scroll(clicks):
         return True
     _do(_pg().scroll, int(clicks), _pause=False)
     return True
+
+
+def type_text(text):
+    """Types text at the cursor (plain keyboard presses). Blocked while paused."""
+    if _paused or not text:
+        return False
+    if _dry_run:
+        print(f"[dry-run] type_text({text!r})")
+        return True
+    _do(_pg().write, text, interval=0, _pause=False)
+    return True

@@ -50,7 +50,7 @@ class FakeActions:
     def __init__(self, w=1000, h=800):
         self.w, self.h = w, h
         self.paused = False
-        self.moves, self.clicks, self.scrolls = [], 0, []
+        self.moves, self.clicks, self.scrolls, self.typed = [], 0, [], []
         self.pos = (w // 2, h // 2)
 
     def screen_size(self):
@@ -76,3 +76,10 @@ class FakeActions:
     def scroll(self, n):
         if not self.paused and n:
             self.scrolls.append(n)
+
+    def set_paused(self, value):
+        self.paused = value
+
+    def type_text(self, text):
+        if not self.paused and text:
+            self.typed.append(text)

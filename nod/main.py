@@ -1,7 +1,7 @@
 """Nod: hands-free computer control. Run with:  .venv/bin/python -m nod.main
 
 Add --dry-run to print what the mouse WOULD do without touching it.
-Global hotkeys (work from any app): ctrl+alt+p pause/resume, ctrl+alt+c recenter, ctrl+alt+d dwell click on/off, ctrl+alt+g eye jump on/off, k = calibrate eye jump, ctrl+alt+q quit.
+Global hotkeys (work from any app): ctrl+alt+p pause/resume, ctrl+alt+c recenter, ctrl+alt+d dwell click on/off, ctrl+alt+g eye jump on/off, ctrl+alt+v voice (if enabled), k = calibrate eye jump, ctrl+alt+q quit.
 """
 import argparse
 import queue
@@ -15,6 +15,7 @@ from nod.config import load_config
 from nod.controller import Controller
 from nod.face import FaceTracker
 from nod.gaze import GazeMapper
+from nod.voice import apply_command, parse_command
 from nod.gaze_calibration import CAL_PATH, run_calibration
 from nod.hud import draw_hud, draw_mesh
 
@@ -36,6 +37,11 @@ def main():
     mapper = GazeMapper.load(CAL_PATH, actions.screen_size())
     controller = Controller(cfg, actions, mapper)
     print("Eye jump:", f"calibrated (error ~{mapper.error_px:.0f}px)" if mapper else "not calibrated yet. Press k in the preview window.")
+    voice = None
+    if cfg["voice"]["enabled"]:
+        from nod.voice_input import VoiceInput
+        voice = VoiceInput(cfg["voice"], lambda text: hotkeys.events.put(("voice_text", text)))
+        print("Voice is ON: ctrl+alt+v to start/stop talking. Say: scroll up/down, click, pause, resume, type ...")
     listener = hotkeys.start(cfg)
     window = cfg["hud"]["window_name"]
 
@@ -64,7 +70,10 @@ def main():
                 draw_mesh(frame, face.landmarks)
             fps = 0.9 * fps + 0.1 * (1.0 / max(now - last, 1e-6))
             last = now
-            draw_hud(frame, controller.hud_info(), fps, face is not None)
+            info = controller.hud_info()
+            if voice:
+                info["lines"].append(voice.status)
+            draw_hud(frame, info, fps, face is not None)
             cv2.imshow(window, frame)
 
             key = cv2.waitKey(1) & 0xFF
@@ -89,6 +98,13 @@ def main():
                         raise KeyboardInterrupt
                     if event == "recenter":
                         controller.recenter()
+                    if event == "voice_toggle" and voice:
+                        voice.toggle()
+                    if isinstance(event, tuple) and event[0] == "voice_text":
+                        cmd = parse_command(event[1])
+                        print(f'voice: "{event[1]}" ->', cmd if cmd else "not understood, ignored")
+                        if cmd:
+                            apply_command(cmd, actions, cfg["voice"])
                     if event == "gaze_toggle":
                         print("eye jump:", _gaze_label(controller.toggle_gaze()))
                     if event == "dwell_toggle":
@@ -98,6 +114,8 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
+        if voice:
+            voice.close()
         if listener:
             listener.stop()
         tracker.close()
