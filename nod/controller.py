@@ -5,12 +5,13 @@ a fake one and check what it would have done without touching the real mouse.
 """
 import math
 
+from nod.gaze import GazeJump, GazeTracker, is_blinking
 from nod.gestures import DwellClick, HoldTrigger
 from nod.pointer import HeadPointer
 
 
 class Controller:
-    def __init__(self, cfg, actions):
+    def __init__(self, cfg, actions, gaze_mapper=None):
         self.cfg = cfg
         self.actions = actions
         self.pointer = HeadPointer(cfg)
@@ -26,6 +27,12 @@ class Controller:
         sc = cfg["scroll"]
         self.scroll_cfg = sc
         self.mode_trigger = HoldTrigger(sc["threshold"], sc["release_threshold"], sc["hold_ms"], sc["cooldown_ms"])
+        # Eye jump (M4). Only active once a calibrated mapper is supplied.
+        self.gaze_cfg = cfg["gaze"]
+        self.gaze = None
+        self.gaze_enabled = False
+        self.gaze_point = None
+        self.set_gaze_mapper(gaze_mapper)
         self.mode = "POINT"
         self._scroll_neutral = None
         self._scroll_entered = 0.0
@@ -53,6 +60,25 @@ class Controller:
         self.pointer.reset()
         self._move()
 
+    def set_gaze_mapper(self, mapper):
+        """Give the controller a (re)calibrated mapper, or None to turn eye jump off."""
+        self.gaze_jump = GazeJump(self.gaze_cfg, (self.screen_w, self.screen_h))
+        if mapper is None or not mapper.ready:
+            self.gaze, self.gaze_enabled = None, False
+        else:
+            self.gaze = GazeTracker(mapper, self.gaze_cfg)
+            self.gaze_enabled = self.gaze_cfg["enabled"]
+        self.gaze_point = None
+
+    def toggle_gaze(self):
+        """Returns True/False for on/off, or None if there's no calibration yet."""
+        if self.gaze is None:
+            return None
+        self.gaze_enabled = not self.gaze_enabled
+        self.gaze_jump.reset()
+        self.gaze.reset()
+        return self.gaze_enabled
+
     def toggle_dwell(self):
         self.dwell_enabled = not self.dwell_enabled
         self.dwell.reset()
@@ -62,6 +88,9 @@ class Controller:
         self.click_trigger.reset()
         self.dwell.reset()
         self.mode_trigger.reset()
+        self.gaze_jump.reset()
+        if self.gaze:
+            self.gaze.reset()
 
     def _set_mode(self, mode, now):
         """Switch POINT <-> SCROLL. Resets the pointer so there's no jump when coming back."""
@@ -69,6 +98,7 @@ class Controller:
         self.pointer.reset()
         self.click_trigger.reset()
         self.dwell.reset()
+        self.gaze_jump.reset()
         self._scroll_neutral = None
         self._scroll_acc = 0.0
         self._scroll_last_t = None
@@ -146,10 +176,25 @@ class Controller:
             self.cursor[1] += dy
             self._move()
 
+        self._eye_jump(face, speed, now)
+
         if self.click_trigger.update(jaw, now):
             self.actions.click()
         if self.dwell_enabled and self.dwell.update(self.cursor, now):
             self.actions.click()
+
+    def _eye_jump(self, face, head_speed, now):
+        """Big jump with the eyes; the head pointer does the fine aim afterwards."""
+        if not (self.gaze_enabled and self.gaze):
+            return
+        if is_blinking(face, self.gaze_cfg["blink_threshold"]):
+            return   # ignore blink frames entirely (don't reset the look timer either)
+        self.gaze_point = self.gaze.update(face, now)
+        target = self.gaze_jump.update(self.gaze_point, self.cursor, head_speed, now)
+        if target:
+            self.cursor = list(target)
+            self._move()
+            self.pointer.reset()   # head deltas restart from here; no leftover motion
 
     # ---- what the HUD should show ----
     def hud_info(self):
@@ -160,6 +205,14 @@ class Controller:
             lines.append(f"scroll {self.scroll_rate:+5.1f} lines/s  (head down = down)")
         bars = [("click", self.click_trigger.progress, (80, 200, 80)),
                 ("scroll toggle", self.mode_trigger.progress, (255, 160, 60))]
+        if self.gaze is None:
+            lines.append("eye jump: not calibrated (press k)")
+        elif self.gaze_enabled:
+            gp = self.gaze_point
+            lines.append("gaze " + (f"({gp[0]:.0f}, {gp[1]:.0f})" if gp else "-") + f"  cal err ~{self.gaze.mapper.error_px:.0f}px")
+            bars.append(("eye jump", self.gaze_jump.progress, (255, 100, 200)))
+        else:
+            lines.append("eye jump: OFF")
         if self.dwell_enabled:
             bars.append(("dwell", self.dwell.progress, (200, 200, 60)))
         return {"mode": self.display_mode, "lines": lines, "bars": bars}
