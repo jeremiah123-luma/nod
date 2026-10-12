@@ -7,7 +7,7 @@ import math
 from collections import deque
 
 from nod.gaze import GazeJump, GazeTracker, is_blinking
-from nod.gestures import DwellClick, HoldTrigger
+from nod.gestures import DwellClick, HoldTrigger, Neutral
 from nod.pointer import HeadPointer
 
 
@@ -27,7 +27,16 @@ class Controller:
         self.dwell_enabled = d["enabled"]
         sc = cfg["scroll"]
         self.scroll_cfg = sc
-        self.mode_trigger = HoldTrigger(sc["threshold"], sc["release_threshold"], sc["hold_ms"], sc["cooldown_ms"])
+        gestures = sc["gestures"]
+        if sc["toggle_gesture"] not in gestures:
+            raise ValueError(f'scroll.toggle_gesture must be one of {sorted(gestures)}, got "{sc["toggle_gesture"]}"')
+        tg = gestures[sc["toggle_gesture"]]
+        self.toggle_shape = tg["blendshape"]
+        # The toggle fires on a RISE above your relaxed value ("delta"), not on a fixed number.
+        self.mode_trigger = HoldTrigger(tg["delta"], tg["release_delta"], tg["hold_ms"], sc["cooldown_ms"])
+        self.neutral = Neutral(sc["neutral_ms"] / 1000.0, [g["blendshape"] for g in gestures.values()])
+        self._gate_ok_since = None
+        self.toggle_note = "calibrating neutral..."     # shown on the HUD: why the toggle can/can't fire
         # Eye jump (M4). Only active once a calibrated mapper is supplied.
         self.gaze_cfg = cfg["gaze"]
         self.gaze = None
@@ -60,6 +69,8 @@ class Controller:
         """Put the cursor in the middle of the screen and forget the old head position."""
         self.cursor = [self.screen_w / 2, self.screen_h / 2]
         self.pointer.reset()
+        self.neutral.restart()      # also re-learn your relaxed face + level head pitch
+        self._gate_ok_since = None
         self._move()
 
     def set_gaze_mapper(self, mapper):
@@ -80,6 +91,35 @@ class Controller:
         self.gaze_jump.reset()
         self.gaze.reset()
         return self.gaze_enabled
+
+    def _toggle_value(self, face, now):
+        """How far past 'relaxed' the toggle gesture is, or 0 if the head isn't calm and level.
+
+        This is what stops tilting your head up (which also lifts your brows) from toggling scroll.
+        """
+        sc = self.scroll_cfg
+        fy = self.pointer.filtered[1]
+        if not self.neutral.ready:
+            self._gate_ok_since = None
+            self.toggle_note = f"calibrating neutral {self.neutral.progress:.0%} (relax your face, look at the screen)"
+            return 0.0
+        ref_y = self._scroll_neutral if (self.mode == "SCROLL" and self._scroll_neutral is not None) else self.neutral.head_y
+        off = abs(fy - ref_y)
+        if off > sc["gate_pitch_window"]:
+            self._gate_ok_since = None
+            self.toggle_note = f"blocked: head pitch {off:.1f} from level (max {sc['gate_pitch_window']:.0f})"
+            return 0.0
+        if self.pointer.speed_px > sc["gate_max_head_speed_px_s"]:
+            self._gate_ok_since = None
+            self.toggle_note = f"blocked: head moving ({self.pointer.speed_px:.0f}px/s)"
+            return 0.0
+        if self._gate_ok_since is None:
+            self._gate_ok_since = now
+        if now - self._gate_ok_since < sc["gate_settle_ms"] / 1000.0:
+            self.toggle_note = "steadying..."
+            return 0.0
+        self.toggle_note = "ready"
+        return face.blend.get(self.toggle_shape, 0.0) - self.neutral.shape[self.toggle_shape]
 
     def toggle_dwell(self):
         self.dwell_enabled = not self.dwell_enabled
@@ -147,6 +187,9 @@ class Controller:
             self._reset_gestures()
             self._scroll_neutral = None
             self._scroll_last_t = None
+            self._gate_ok_since = None
+            if not self.neutral.ready:
+                self.neutral.restart()    # lost the face mid-capture: start the capture over
             self.debug = {}
             self._was_paused = self._was_paused or paused
             return
@@ -156,8 +199,9 @@ class Controller:
         dx, dy, speed = self.pointer.update(face.head_x, face.head_y, now)
         self.trace.append((*self.pointer.raw[:1], self.pointer.filtered[0], self.pointer.raw[1], self.pointer.filtered[1]))
         jaw = face.blend.get(self.click_shape, 0.0)
-        brow = face.blend.get(self.scroll_cfg["toggle_blendshape"], 0.0)
+        brow = face.blend.get(self.toggle_shape, 0.0)
         self.debug = {"head_x": face.head_x, "head_y": face.head_y, "jaw": jaw, "brow": brow, "speed": speed}
+        self.neutral.update(face, now)    # learns your relaxed face; runs even while paused
 
         if paused:
             self._was_paused = True
@@ -171,7 +215,10 @@ class Controller:
             return
 
         # Eyebrow raise (held briefly) flips between POINT and SCROLL.
-        if self.mode_trigger.update(brow, now):
+        toggle_delta = self._toggle_value(face, now)
+        self.debug["toggle_delta"] = toggle_delta
+        if self.mode_trigger.update(toggle_delta, now):
+            self._gate_ok_since = None
             self._set_mode("SCROLL" if self.mode == "POINT" else "POINT", now)
             return
 
@@ -210,7 +257,9 @@ class Controller:
         lines = [f"head RAW    x {raw[0]:+7.2f}  y {raw[1]:+7.2f}",
                  f"head SMOOTH x {sm[0]:+7.2f}  y {sm[1]:+7.2f}   pointer {self.pointer.state}  {self.pointer.speed_px:4.0f}px/s",
                  f"{self.click_shape} {self.debug.get('jaw', 0):.2f}  (click at {self.click_trigger.threshold})",
-                 f"{self.scroll_cfg['toggle_blendshape']} {self.debug.get('brow', 0):.2f}  (toggle at {self.mode_trigger.threshold})"]
+                 f"{self.toggle_shape} {self.debug.get('brow', 0):.2f}  relaxed {self.neutral.shape.get(self.toggle_shape, 0):.2f}"
+                 f"  rise {self.debug.get('toggle_delta', 0):+.2f} (need +{self.mode_trigger.threshold:.2f})",
+                 f"scroll toggle: {self.toggle_note}"]
         if self.mode == "SCROLL":
             lines.append(f"scroll {self.scroll_rate:+5.1f} lines/s  (head down = down)")
         bars = [("click", self.click_trigger.progress, (80, 200, 80)),

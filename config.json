@@ -46,16 +46,31 @@
     "radius_px": 12
   },
   "scroll": {
-    "toggle_blendshape": "browInnerUp",
-    "threshold": 0.5,
-    "release_threshold": 0.25,
-    "hold_ms": 300,
     "cooldown_ms": 900,
     "settle_ms": 500,
     "deadzone": 4.0,
     "gain": 1.2,
     "max_clicks_per_s": 30,
-    "invert": false
+    "invert": false,
+    "toggle_gesture": "brows",
+    "gestures": {
+      "brows": {
+        "blendshape": "browInnerUp",
+        "delta": 0.3,
+        "release_delta": 0.12,
+        "hold_ms": 350
+      },
+      "pucker": {
+        "blendshape": "mouthPucker",
+        "delta": 0.35,
+        "release_delta": 0.15,
+        "hold_ms": 350
+      }
+    },
+    "neutral_ms": 1200,
+    "gate_pitch_window": 6.0,
+    "gate_max_head_speed_px_s": 60,
+    "gate_settle_ms": 400
   },
   "gaze": {
     "enabled": true,

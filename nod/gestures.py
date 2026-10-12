@@ -3,6 +3,7 @@
 All times are in seconds (`now`) and all settings come from config.json.
 """
 import math
+import statistics
 
 
 class HoldTrigger:
@@ -81,3 +82,43 @@ class DwellClick:
             self.progress = 0.0
             return True
         return False
+
+
+class Neutral:
+    """Your relaxed face and head pose: the reference the toggle gesture is measured against.
+
+    Collects `duration_s` of frames, then keeps the MEDIAN of each number (so a blink or a
+    twitch during that moment doesn't spoil it). Restart it (recenter) whenever you change posture.
+    """
+
+    def __init__(self, duration_s, shapes):
+        self.duration = duration_s
+        self.shapes = list(shapes)
+        self.restart()
+
+    def restart(self):
+        self._start = None
+        self._progress = 0.0
+        self._head_y = []
+        self._shape_vals = {s: [] for s in self.shapes}
+        self.ready = False
+        self.head_y = 0.0
+        self.shape = {s: 0.0 for s in self.shapes}   # relaxed value of each blendshape
+
+    @property
+    def progress(self):
+        return 1.0 if self.ready else self._progress
+
+    def update(self, face, now):
+        if self.ready:
+            return
+        if self._start is None:
+            self._start = now
+        self._head_y.append(face.head_y)
+        for s in self.shapes:
+            self._shape_vals[s].append(face.blend.get(s, 0.0))
+        self._progress = min(1.0, (now - self._start) / self.duration)
+        if self._progress >= 1.0:
+            self.head_y = statistics.median(self._head_y)
+            self.shape = {s: statistics.median(v) for s, v in self._shape_vals.items()}
+            self.ready = True

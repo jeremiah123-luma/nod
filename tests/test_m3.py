@@ -11,6 +11,12 @@ class ScrollModeTests(unittest.TestCase):
         self.fake = FakeActions()
         self.c = Controller(self.cfg, self.fake)
         self.t = 0.0
+        self.warm(0.0)
+
+    def warm(self, head_y=0.0, head_x=0.0):
+        """Let the controller learn your relaxed face + level head (it does this on startup / recenter)."""
+        self.c.neutral.restart()
+        self.step(50, head_x, head_y)
 
     def step(self, frames, head_x=0.0, head_y=0.0, **blend):
         for _ in range(frames):
@@ -22,7 +28,7 @@ class ScrollModeTests(unittest.TestCase):
         self.step(15, head_x, head_y, browInnerUp=0.0)
 
     def enter_scroll(self, head_y=0.0):
-        self.step(5, head_y=head_y)
+        self.warm(head_y)
         self.brow_raise(head_y=head_y)
         self.assertEqual(self.c.mode, "SCROLL")
         self.step(20, head_y=head_y)     # let it settle
@@ -86,7 +92,7 @@ class ScrollModeTests(unittest.TestCase):
         self.step(20)
         self.enter_scroll()
         self.step(30, head_x=25.0, head_y=0.0)   # head turned a lot while scrolling
-        self.step(30, head_x=25.0)
+        self.step(120, head_x=25.0)       # let the heavily-smoothed head signal settle (the toggle needs a calm head)
         self.brow_raise(head_x=25.0)
         self.assertEqual(self.c.mode, "POINT")
         before = list(self.c.cursor)
