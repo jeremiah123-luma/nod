@@ -36,5 +36,17 @@
     "enabled": false,
     "dwell_ms": 600,
     "radius_px": 12
+  },
+  "scroll": {
+    "toggle_blendshape": "browInnerUp",
+    "threshold": 0.5,
+    "release_threshold": 0.25,
+    "hold_ms": 300,
+    "cooldown_ms": 900,
+    "settle_ms": 500,
+    "deadzone": 4.0,
+    "gain": 1.2,
+    "max_clicks_per_s": 30,
+    "invert": false
   }
 }

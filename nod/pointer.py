@@ -22,10 +22,12 @@ class HeadPointer:
         self._fy.reset()
         self._prev = None
         self._prev_t = None
+        self.filtered = None
 
     def update(self, head_x, head_y, now):
         """Returns (dx_px, dy_px, speed_px_per_s): how far to nudge the cursor this frame."""
         fx, fy = self._fx(head_x, now), self._fy(head_y, now)
+        self.filtered = (fx, fy)   # smoothed head position; scroll mode reads this
         if self._prev is None:
             self._prev, self._prev_t = (fx, fy), now
             return 0.0, 0.0, 0.0
