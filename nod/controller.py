@@ -13,12 +13,39 @@ from nod.pointer import HeadPointer
 
 class Controller:
     def __init__(self, cfg, actions, gaze_mapper=None):
-        self.cfg = cfg
         self.actions = actions
-        self.pointer = HeadPointer(cfg)
         self.screen_w, self.screen_h = actions.screen_size()
-        self.margin = cfg["pointer"]["edge_margin_px"]
         self.cursor = [self.screen_w / 2, self.screen_h / 2]
+        self.neutral = None
+        self.gaze = None
+        self.gaze_enabled = False
+        self.gaze_point = None
+        self.gaze_trail = deque(maxlen=25)      # recent gaze points, drawn on the HUD minimap
+        self._jump_note = "waiting for gaze"
+        self._jump_flash = None                 # (target, until_time) briefly highlights a jump
+        self._gate_ok_since = None
+        self.toggle_note = "calibrating neutral..."     # shown on the HUD: why the toggle can/can't fire
+        self.mode = "POINT"
+        self._scroll_neutral = None
+        self._scroll_entered = 0.0
+        self._scroll_acc = 0.0
+        self._scroll_last_t = None
+        self.scroll_rate = 0.0
+        self._was_paused = False
+        self._last_paused = None
+        self._neutral_logged = False
+        self._last_now = 0.0
+        self.debug = {}
+        self.trace = deque(maxlen=120)   # recent (raw_x, smooth_x, raw_y, smooth_y), drawn on the HUD
+        self.log = deque(maxlen=60)      # activity feed shown on the dashboard
+        self._build(cfg)
+        self.set_gaze_mapper(gaze_mapper)
+
+    def _build(self, cfg):
+        """(Re)creates everything that comes from config.json. Used at startup and by reload()."""
+        self.cfg = cfg
+        self.pointer = HeadPointer(cfg)
+        self.margin = cfg["pointer"]["edge_margin_px"]
         k = cfg["click"]
         self.click_trigger = HoldTrigger(k["threshold"], k["release_threshold"], k["hold_ms"], k["cooldown_ms"])
         self.click_shape = k["blendshape"]
@@ -34,28 +61,25 @@ class Controller:
         self.toggle_shape = tg["blendshape"]
         # The toggle fires on a RISE above your relaxed value ("delta"), not on a fixed number.
         self.mode_trigger = HoldTrigger(tg["delta"], tg["release_delta"], tg["hold_ms"], sc["cooldown_ms"])
-        self.neutral = Neutral(sc["neutral_ms"] / 1000.0, [g["blendshape"] for g in gestures.values()])
-        self._gate_ok_since = None
-        self.toggle_note = "calibrating neutral..."     # shown on the HUD: why the toggle can/can't fire
-        # Eye jump (M4). Only active once a calibrated mapper is supplied.
+        shapes = [g["blendshape"] for g in gestures.values()]
+        if self.neutral is None or self.neutral.shapes != shapes:
+            self.neutral = Neutral(sc["neutral_ms"] / 1000.0, shapes)     # keep what we learned otherwise
         self.gaze_cfg = cfg["gaze"]
-        self.gaze = None
-        self.gaze_enabled = False
-        self.gaze_point = None
-        self.gaze_trail = deque(maxlen=25)      # recent gaze points, drawn on the HUD minimap
-        self._jump_note = "waiting for gaze"
-        self._jump_flash = None                 # (target, until_time) briefly highlights a jump
-        self.set_gaze_mapper(gaze_mapper)
-        self.mode = "POINT"
-        self._scroll_neutral = None
-        self._scroll_entered = 0.0
-        self._scroll_acc = 0.0
-        self._scroll_last_t = None
-        self.scroll_rate = 0.0
-        self._was_paused = False
-        self._last_now = 0.0
-        self.debug = {}
-        self.trace = deque(maxlen=120)   # recent (raw_x, smooth_x, raw_y, smooth_y), drawn on the HUD
+        self.gaze_jump = GazeJump(self.gaze_cfg, (self.screen_w, self.screen_h))
+        if self.gaze is not None:
+            self.gaze = GazeTracker(self.gaze.mapper, self.gaze_cfg)
+            self.gaze_enabled = self.gaze_cfg["enabled"]
+
+    def reload(self, cfg):
+        """Apply changed settings while running (the dashboard sliders use this)."""
+        was_mode = self.mode
+        self._build(cfg)
+        self.mode = was_mode
+        self._log("settings", "Settings updated")
+
+    def _log(self, kind, text):
+        import time as _time
+        self.log.append({"t": _time.time(), "kind": kind, "text": text})
 
     # ---- helpers ----
     def _clamp(self):
@@ -74,8 +98,10 @@ class Controller:
         self.cursor = [self.screen_w / 2, self.screen_h / 2]
         self.pointer.reset()
         self.neutral.restart()      # also re-learn your relaxed face + level head pitch
+        self._neutral_logged = False
         self._gate_ok_since = None
         self._move()
+        self._log("recenter", "Recentered - hold a relaxed face for a moment")
 
     def set_gaze_mapper(self, mapper):
         """Give the controller a (re)calibrated mapper, or None to turn eye jump off."""
@@ -87,6 +113,8 @@ class Controller:
             self.gaze_enabled = self.gaze_cfg["enabled"]
         self.gaze_point = None
         self.gaze_trail.clear()
+        if self.gaze is not None:
+            self._log("gaze", f"Eye jump ready ({mapper.label}, ~{mapper.error_px:.0f}px error)")
 
     def toggle_gaze(self):
         """Returns True/False for on/off, or None if there's no calibration yet."""
@@ -95,6 +123,7 @@ class Controller:
         self.gaze_enabled = not self.gaze_enabled
         self.gaze_jump.reset()
         self.gaze.reset()
+        self._log("gaze", "Eye jump ON" if self.gaze_enabled else "Eye jump OFF")
         return self.gaze_enabled
 
     def _toggle_value(self, face, now):
@@ -129,6 +158,7 @@ class Controller:
     def toggle_dwell(self):
         self.dwell_enabled = not self.dwell_enabled
         self.dwell.reset()
+        self._log("click", "Dwell click ON" if self.dwell_enabled else "Dwell click OFF")
         return self.dwell_enabled
 
     def _reset_gestures(self):
@@ -142,6 +172,7 @@ class Controller:
     def _set_mode(self, mode, now):
         """Switch POINT <-> SCROLL. Resets the pointer so there's no jump when coming back."""
         self.mode = mode
+        self._log("mode", "SCROLL mode on - tilt your head to scroll" if mode == "SCROLL" else "Back to POINT mode")
         self.pointer.reset()
         self.click_trigger.reset()
         self.dwell.reset()
@@ -188,6 +219,10 @@ class Controller:
     def update(self, face, now):
         self._last_now = now
         paused = self.actions.is_paused()
+        if paused != self._last_paused:
+            if self._last_paused is not None:
+                self._log("pause", "Paused - mouse control off" if paused else "Resumed - you're in control")
+            self._last_paused = paused
         if face is None:
             self.pointer.reset()  # avoid a jump when the face comes back
             self._reset_gestures()
@@ -209,6 +244,9 @@ class Controller:
         self.debug = {"head_x": face.head_x, "head_y": face.head_y, "jaw": jaw, "brow": brow, "speed": speed,
                       "gaze_h": face.gaze_h, "gaze_v": face.gaze_v}
         self.neutral.update(face, now)    # learns your relaxed face; runs even while paused
+        if self.neutral.ready and not self._neutral_logged:
+            self._neutral_logged = True
+            self._log("neutral", "Learned your relaxed face and level head")
 
         if paused:
             self._was_paused = True
@@ -242,8 +280,10 @@ class Controller:
 
         if self.click_trigger.update(jaw, now):
             self.actions.click()
+            self._log("click", "Click (mouth)")
         if self.dwell_enabled and self.dwell.update(self.cursor, now):
             self.actions.click()
+            self._log("click", "Click (dwell)")
 
     def _eye_jump(self, face, head_speed, now):
         """Big jump with the eyes; the head pointer does the fine aim afterwards."""
@@ -262,6 +302,7 @@ class Controller:
             self.pointer.reset()   # head deltas restart from here; no leftover motion
             self._jump_flash = (target, now + 0.8)
             self._jump_note = f"JUMPED to ({target[0]:.0f}, {target[1]:.0f})"
+            self._log("jump", f"Eye jump to ({target[0]:.0f}, {target[1]:.0f})")
 
     def jump_status(self):
         """One line saying why an eye jump did or didn't fire right now."""
@@ -303,3 +344,43 @@ class Controller:
                         "trail": list(self.gaze_trail), "cursor": tuple(self.cursor),
                         "radius": self.gaze_jump.min_dist, "enabled": self.gaze_enabled, "flash": flash}
         return {"mode": self.display_mode, "lines": lines, "bars": bars, "trace": list(self.trace), "gaze_map": gaze_map}
+
+    # ---- what the dashboard should show (plain numbers/strings only, safe to send as JSON) ----
+    def snapshot(self):
+        r2 = lambda v: round(float(v), 2)
+        raw, sm = self.pointer.raw or (0.0, 0.0), self.pointer.filtered or (0.0, 0.0)
+        jaw = self.debug.get("jaw", 0.0)
+        brow = self.debug.get("brow", 0.0)
+        relaxed = self.neutral.shape.get(self.toggle_shape, 0.0)
+        gaze = {"calibrated": self.gaze is not None, "enabled": self.gaze_enabled, "status": self.jump_status(),
+                "progress": r2(self.gaze_jump.progress), "radius": round(self.gaze_jump.min_dist)}
+        if self.gaze is not None:
+            m = self.gaze.mapper
+            diag = math.hypot(self.screen_w, self.screen_h)
+            gaze.update(model=m.label, error_px=round(m.error_px), error_pct=round(100 * m.error_px / diag, 1),
+                        point=[round(v) for v in self.gaze_point] if (self.gaze_point and self.gaze_enabled) else None,
+                        trail=[[round(p[0]), round(p[1])] for p in self.gaze_trail],
+                        flash=[round(v) for v in self._jump_flash[0]]
+                        if self._jump_flash and self._jump_flash[1] > self._last_now else None)
+        return {
+            "mode": self.display_mode,
+            "paused": self.actions.is_paused(),
+            "face": bool(self.debug),
+            "screen": [self.screen_w, self.screen_h],
+            "cursor": [round(self.cursor[0]), round(self.cursor[1])],
+            "pointer": {"state": self.pointer.state, "speed": round(self.pointer.speed_px),
+                        "raw": [r2(raw[0]), r2(raw[1])], "smooth": [r2(sm[0]), r2(sm[1])]},
+            "trace": [[r2(v) for v in t] for t in list(self.trace)[-90:]],
+            "iris": [r2(self.debug.get("gaze_h", 0.0)), r2(self.debug.get("gaze_v", 0.0))],
+            "click": {"shape": self.click_shape, "value": r2(jaw), "threshold": self.click_trigger.threshold,
+                      "progress": r2(self.click_trigger.progress)},
+            "dwell": {"enabled": self.dwell_enabled, "progress": r2(self.dwell.progress)},
+            "toggle": {"gesture": self.scroll_cfg["toggle_gesture"], "shape": self.toggle_shape, "value": r2(brow),
+                       "relaxed": r2(relaxed), "rise": r2(self.debug.get("toggle_delta", 0.0)),
+                       "need": self.mode_trigger.threshold, "note": self.toggle_note,
+                       "progress": r2(self.mode_trigger.progress)},
+            "neutral": {"ready": self.neutral.ready, "progress": r2(self.neutral.progress)},
+            "scroll": {"active": self.mode == "SCROLL", "rate": r2(self.scroll_rate)},
+            "gaze": gaze,
+            "log": list(self.log)[-30:],
+        }
