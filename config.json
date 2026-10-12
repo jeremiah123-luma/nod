@@ -19,9 +19,22 @@
   "hotkeys": {
     "pause": "<ctrl>+<alt>+p",
     "recenter": "<ctrl>+<alt>+c",
-    "quit": "<ctrl>+<alt>+q"
+    "quit": "<ctrl>+<alt>+q",
+    "dwell_toggle": "<ctrl>+<alt>+d"
   },
   "hud": {
     "window_name": "Nod (q = quit, c = recenter)"
+  },
+  "click": {
+    "blendshape": "jawOpen",
+    "threshold": 0.5,
+    "release_threshold": 0.25,
+    "hold_ms": 250,
+    "cooldown_ms": 600
+  },
+  "dwell": {
+    "enabled": false,
+    "dwell_ms": 600,
+    "radius_px": 12
   }
 }

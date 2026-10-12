@@ -1,7 +1,7 @@
 """Nod: hands-free computer control. Run with:  .venv/bin/python -m nod.main
 
 Add --dry-run to print what the mouse WOULD do without touching it.
-Global hotkeys (work from any app): ctrl+alt+p pause/resume, ctrl+alt+c recenter, ctrl+alt+q quit.
+Global hotkeys (work from any app): ctrl+alt+p pause/resume, ctrl+alt+c recenter, ctrl+alt+d dwell click on/off, ctrl+alt+q quit.
 """
 import argparse
 import queue
@@ -64,6 +64,8 @@ def main():
                 break
             if key == ord("c"):
                 controller.recenter()
+            if key == ord("d"):
+                print("dwell click:", "ON" if controller.toggle_dwell() else "OFF")
             try:
                 while True:
                     event = hotkeys.events.get_nowait()
@@ -71,6 +73,8 @@ def main():
                         raise KeyboardInterrupt
                     if event == "recenter":
                         controller.recenter()
+                    if event == "dwell_toggle":
+                        print("dwell click:", "ON" if controller.toggle_dwell() else "OFF")
             except queue.Empty:
                 pass
     except KeyboardInterrupt:

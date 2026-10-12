@@ -17,6 +17,8 @@ def build_bindings(cfg):
         keys["recenter"]: lambda: events.put("recenter"),
         keys["quit"]: lambda: events.put("quit"),
     }
+    if "dwell_toggle" in keys:
+        bindings[keys["dwell_toggle"]] = lambda: events.put("dwell_toggle")
     if "gaze_toggle" in keys:
         bindings[keys["gaze_toggle"]] = lambda: events.put("gaze_toggle")
     return bindings
