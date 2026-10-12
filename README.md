@@ -32,10 +32,12 @@ Nod **starts paused**. Press **ctrl+alt+p** when you're ready.
 | ctrl+alt+c | recenter cursor to the middle of the screen |
 | ctrl+alt+d | dwell click on/off (hold still ~0.6 s = click) |
 | ctrl+alt+g | eye jump on/off |
+| ctrl+alt+k | calibrate eye jump (look at the dots, ~35 s) |
 | ctrl+alt+v | voice: start / stop talking (if enabled) |
 | ctrl+alt+q | quit |
 
 In the preview window: `q` quit, `c` recenter, `d` dwell, `g` eye jump, `k` calibrate eyes.
+(Those only work while the preview window is in front; the ctrl+alt hotkeys work from anywhere.)
 Emergency stop: slam the **real mouse** into the **top-left corner** of the screen.
 
 ## Tests (no camera, no mouse needed)
@@ -53,3 +55,12 @@ System Settings → Privacy & Security, turn on the app you run Python from (Ter
 
 ## Tuning
 Every number you might want to change is in `config.json`. See MORNING_REPORT.md for the list of the ones you'll probably touch first.
+
+## Eye jump: calibrating
+1. Sit the way you normally sit, face lit from the front.
+2. Press **ctrl+alt+k**. A dark full-screen window shows a dot; look at it until it moves. 18 dots, ~35 seconds. ESC cancels.
+3. The terminal prints the result, e.g. `~140 px = 8% of the screen diagonal. GOOD`. Under ~8% is good, 8-13% is OK, over 13% retry.
+4. The preview window's bottom-right **screen map** shows a pink dot (where Nod thinks you're looking) and a green ring (the cursor). The grey circle is the "near cursor" zone: look outside it and hold steady to jump.
+5. The `eye jump:` line on the preview always says why it did or didn't fire.
+
+Recalibrate any time you change seats, lighting, or screen. Press **ctrl+alt+c** (recenter) when you change posture so Nod re-learns your relaxed face and level head.

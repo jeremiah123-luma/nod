@@ -42,6 +42,9 @@ class Controller:
         self.gaze = None
         self.gaze_enabled = False
         self.gaze_point = None
+        self.gaze_trail = deque(maxlen=25)      # recent gaze points, drawn on the HUD minimap
+        self._jump_note = "waiting for gaze"
+        self._jump_flash = None                 # (target, until_time) briefly highlights a jump
         self.set_gaze_mapper(gaze_mapper)
         self.mode = "POINT"
         self._scroll_neutral = None
@@ -50,6 +53,7 @@ class Controller:
         self._scroll_last_t = None
         self.scroll_rate = 0.0
         self._was_paused = False
+        self._last_now = 0.0
         self.debug = {}
         self.trace = deque(maxlen=120)   # recent (raw_x, smooth_x, raw_y, smooth_y), drawn on the HUD
 
@@ -82,6 +86,7 @@ class Controller:
             self.gaze = GazeTracker(mapper, self.gaze_cfg)
             self.gaze_enabled = self.gaze_cfg["enabled"]
         self.gaze_point = None
+        self.gaze_trail.clear()
 
     def toggle_gaze(self):
         """Returns True/False for on/off, or None if there's no calibration yet."""
@@ -181,6 +186,7 @@ class Controller:
 
     # ---- the main step, called once per camera frame ----
     def update(self, face, now):
+        self._last_now = now
         paused = self.actions.is_paused()
         if face is None:
             self.pointer.reset()  # avoid a jump when the face comes back
@@ -200,7 +206,8 @@ class Controller:
         self.trace.append((*self.pointer.raw[:1], self.pointer.filtered[0], self.pointer.raw[1], self.pointer.filtered[1]))
         jaw = face.blend.get(self.click_shape, 0.0)
         brow = face.blend.get(self.toggle_shape, 0.0)
-        self.debug = {"head_x": face.head_x, "head_y": face.head_y, "jaw": jaw, "brow": brow, "speed": speed}
+        self.debug = {"head_x": face.head_x, "head_y": face.head_y, "jaw": jaw, "brow": brow, "speed": speed,
+                      "gaze_h": face.gaze_h, "gaze_v": face.gaze_v}
         self.neutral.update(face, now)    # learns your relaxed face; runs even while paused
 
         if paused:
@@ -243,13 +250,30 @@ class Controller:
         if not (self.gaze_enabled and self.gaze):
             return
         if is_blinking(face, self.gaze_cfg["blink_threshold"]):
+            self._jump_note = "blink (ignored)"
             return   # ignore blink frames entirely (don't reset the look timer either)
         self.gaze_point = self.gaze.update(face, now)
+        self.gaze_trail.append(self.gaze_point)
         target = self.gaze_jump.update(self.gaze_point, self.cursor, head_speed, now)
+        self._jump_note = self.gaze_jump.reason
         if target:
             self.cursor = list(target)
             self._move()
             self.pointer.reset()   # head deltas restart from here; no leftover motion
+            self._jump_flash = (target, now + 0.8)
+            self._jump_note = f"JUMPED to ({target[0]:.0f}, {target[1]:.0f})"
+
+    def jump_status(self):
+        """One line saying why an eye jump did or didn't fire right now."""
+        if self.gaze is None:
+            return "NOT CALIBRATED - press ctrl+alt+k"
+        if not self.gaze_enabled:
+            return "OFF (ctrl+alt+g turns it on)"
+        if self.actions.is_paused():
+            return "paused"
+        if self.mode == "SCROLL":
+            return "idle while in SCROLL mode"
+        return self._jump_note
 
     # ---- what the HUD should show ----
     def hud_info(self):
@@ -264,14 +288,18 @@ class Controller:
             lines.append(f"scroll {self.scroll_rate:+5.1f} lines/s  (head down = down)")
         bars = [("click", self.click_trigger.progress, (80, 200, 80)),
                 ("scroll toggle", self.mode_trigger.progress, (255, 160, 60))]
-        if self.gaze is None:
-            lines.append("eye jump: not calibrated (press k)")
-        elif self.gaze_enabled:
+        lines.append(f"eye jump: {self.jump_status()}")
+        if self.gaze is not None:
             gp = self.gaze_point
-            lines.append("gaze " + (f"({gp[0]:.0f}, {gp[1]:.0f})" if gp else "-") + f"  cal err ~{self.gaze.mapper.error_px:.0f}px")
-            bars.append(("eye jump", self.gaze_jump.progress, (255, 100, 200)))
-        else:
-            lines.append("eye jump: OFF")
-        if self.dwell_enabled:
-            bars.append(("dwell", self.dwell.progress, (200, 200, 60)))
-        return {"mode": self.display_mode, "lines": lines, "bars": bars, "trace": list(self.trace)}
+            lines.append(f"iris h {self.debug.get('gaze_h', 0):+.2f} v {self.debug.get('gaze_v', 0):+.2f}   gaze "
+                         + (f"({gp[0]:.0f}, {gp[1]:.0f})" if gp else "-")
+                         + f"   cal {self.gaze.mapper.label} ~{self.gaze.mapper.error_px:.0f}px")
+            if self.gaze_enabled:
+                bars.append(("eye jump", self.gaze_jump.progress, (255, 100, 200)))
+        flash = self._jump_flash[0] if self._jump_flash and self._jump_flash[1] > self._last_now else None
+        gaze_map = None
+        if self.gaze is not None:
+            gaze_map = {"screen": (self.screen_w, self.screen_h), "gaze": self.gaze_point if self.gaze_enabled else None,
+                        "trail": list(self.gaze_trail), "cursor": tuple(self.cursor),
+                        "radius": self.gaze_jump.min_dist, "enabled": self.gaze_enabled, "flash": flash}
+        return {"mode": self.display_mode, "lines": lines, "bars": bars, "trace": list(self.trace), "gaze_map": gaze_map}

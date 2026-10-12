@@ -171,7 +171,7 @@ class ControllerGazeTests(unittest.TestCase):
         c = Controller(self.cfg, self.fake)
         self.assertFalse(c.gaze_enabled)
         self.assertIsNone(c.toggle_gaze())
-        self.assertIn("not calibrated", " ".join(c.hud_info()["lines"]))
+        self.assertIn("NOT CALIBRATED", " ".join(c.hud_info()["lines"]))
 
     def test_looking_at_far_corner_jumps_cursor_there(self):
         self.look_at(900, 700, 45)

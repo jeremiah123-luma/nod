@@ -19,6 +19,8 @@ def build_bindings(cfg):
     }
     if "dwell_toggle" in keys:
         bindings[keys["dwell_toggle"]] = lambda: events.put("dwell_toggle")
+    if "calibrate" in keys:
+        bindings[keys["calibrate"]] = lambda: events.put("calibrate")
     if "voice_toggle" in keys:
         bindings[keys["voice_toggle"]] = lambda: events.put("voice_toggle")
     if "gaze_toggle" in keys:

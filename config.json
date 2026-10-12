@@ -28,7 +28,8 @@
     "quit": "<ctrl>+<alt>+q",
     "dwell_toggle": "<ctrl>+<alt>+d",
     "gaze_toggle": "<ctrl>+<alt>+g",
-    "voice_toggle": "<ctrl>+<alt>+v"
+    "voice_toggle": "<ctrl>+<alt>+v",
+    "calibrate": "<ctrl>+<alt>+k"
   },
   "hud": {
     "window_name": "Nod (q = quit, c = recenter)"
@@ -75,20 +76,21 @@
   "gaze": {
     "enabled": true,
     "calibration_file": "gaze_calibration.json",
-    "use_head_features": true,
-    "quadratic": false,
     "ridge": 0.1,
     "grid_margin": 0.08,
-    "settle_ms": 800,
+    "settle_ms": 600,
     "collect_ms": 1200,
     "smooth_min_cutoff": 0.8,
     "smooth_beta": 0.005,
     "min_jump_fraction": 0.2,
-    "stable_radius_fraction": 0.06,
+    "stable_radius_fraction": 0.1,
     "dwell_ms": 450,
     "max_head_speed_px_s": 150,
     "cooldown_ms": 1200,
-    "blink_threshold": 0.5
+    "blink_threshold": 0.5,
+    "model": "auto",
+    "passes": 2,
+    "stable_fraction": 0.7
   },
   "voice": {
     "enabled": false,

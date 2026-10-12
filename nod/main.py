@@ -1,7 +1,7 @@
 """Nod: hands-free computer control. Run with:  .venv/bin/python -m nod.main
 
 Add --dry-run to print what the mouse WOULD do without touching it.
-Global hotkeys (work from any app): ctrl+alt+p pause/resume, ctrl+alt+c recenter, ctrl+alt+d dwell click on/off, ctrl+alt+g eye jump on/off, ctrl+alt+v voice (if enabled), k = calibrate eye jump, ctrl+alt+q quit.
+Global hotkeys (work from any app): ctrl+alt+p pause/resume, ctrl+alt+c recenter, ctrl+alt+d dwell click on/off, ctrl+alt+g eye jump on/off, ctrl+alt+v voice (if enabled), ctrl+alt+k = calibrate eye jump, ctrl+alt+q quit.
 """
 import argparse
 import queue
@@ -16,8 +16,17 @@ from nod.controller import Controller
 from nod.face import FaceTracker
 from nod.gaze import GazeMapper
 from nod.voice import apply_command, parse_command
-from nod.gaze_calibration import CAL_PATH, run_calibration
+from nod.gaze_calibration import CAL_PATH, run_calibration, signal_tag
 from nod.hud import draw_hud, draw_mesh
+
+
+def _calibrate(camera, tracker, aspect, cfg, controller):
+    """Runs the dot screen. The mouse is never touched by it, and Nod's pause state is left alone."""
+    print("Eye calibration: look at each dot until it moves. ESC cancels. (~35 seconds)")
+    new_mapper = run_calibration(camera, tracker, aspect, cfg)
+    if new_mapper:
+        controller.set_gaze_mapper(new_mapper)
+        print("Eye jump is now ON. Look at a far part of the screen and hold steady to jump.")
 
 
 def _gaze_label(state):
@@ -34,9 +43,12 @@ def main():
     camera = Camera(cfg["camera"]["index"], cfg["camera"]["width"], cfg["camera"]["height"], cfg["camera"]["fps"])
     aspect = cfg["camera"]["width"] / cfg["camera"]["height"]
     tracker = FaceTracker(cfg)
-    mapper = GazeMapper.load(CAL_PATH, actions.screen_size())
+    mapper = GazeMapper.load(CAL_PATH, actions.screen_size(), signal_tag(cfg))
     controller = Controller(cfg, actions, mapper)
-    print("Eye jump:", f"calibrated (error ~{mapper.error_px:.0f}px)" if mapper else "not calibrated yet. Press k in the preview window.")
+    if mapper:
+        print(f"Eye jump: calibrated ({mapper.label}, error ~{mapper.error_px:.0f}px). Recalibrate any time with ctrl+alt+k.")
+    else:
+        print("Eye jump: NOT calibrated (or the old calibration is out of date). Press ctrl+alt+k, then look at each dot.")
     voice = None
     if cfg["voice"]["enabled"]:
         from nod.voice_input import VoiceInput
@@ -82,11 +94,7 @@ def main():
             if key == ord("c"):
                 controller.recenter()
             if key == ord("k"):
-                actions.set_paused(True)   # no mouse control while the dots are showing
-                new_mapper = run_calibration(camera, tracker, aspect, cfg)
-                if new_mapper:
-                    controller.set_gaze_mapper(new_mapper)
-                print("Still PAUSED. Press ctrl+alt+p to resume.")
+                _calibrate(camera, tracker, aspect, cfg, controller)
             if key == ord("g"):
                 print("eye jump:", _gaze_label(controller.toggle_gaze()))
             if key == ord("d"):
@@ -105,6 +113,8 @@ def main():
                         print(f'voice: "{event[1]}" ->', cmd if cmd else "not understood, ignored")
                         if cmd:
                             apply_command(cmd, actions, cfg["voice"])
+                    if event == "calibrate":
+                        _calibrate(camera, tracker, aspect, cfg, controller)
                     if event == "gaze_toggle":
                         print("eye jump:", _gaze_label(controller.toggle_gaze()))
                     if event == "dwell_toggle":

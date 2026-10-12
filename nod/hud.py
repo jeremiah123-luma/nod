@@ -41,6 +41,36 @@ def _plot(frame, label, raw, smooth, x0, y0, w=150, h=44):
     _text(frame, f"{label} (+-{span:.1f})", x0 + 3, y0 + 12, (255, 255, 255), 0.4)
 
 
+def draw_gaze_map(frame, gm):
+    """A tiny map of the SCREEN: pink dot = where you're looking, green ring = cursor,
+    grey circle = the 'near cursor' zone (look outside it, hold steady, and the cursor jumps)."""
+    fh, fw = frame.shape[:2]
+    sw, sh = gm["screen"]
+    mw = 200
+    mh = max(40, int(mw * sh / sw))
+    x0, y0 = fw - mw - 10, fh - mh - 28
+    k = mw / sw
+    cv2.rectangle(frame, (x0, y0), (x0 + mw, y0 + mh), (25, 25, 25), -1)
+    for i in (1, 2):
+        cv2.line(frame, (x0 + mw * i // 3, y0), (x0 + mw * i // 3, y0 + mh), (60, 60, 60), 1)
+        cv2.line(frame, (x0, y0 + mh * i // 3), (x0 + mw, y0 + mh * i // 3), (60, 60, 60), 1)
+    cv2.rectangle(frame, (x0, y0), (x0 + mw, y0 + mh), (160, 160, 160), 1)
+
+    def at(p):
+        return (x0 + int(max(0, min(sw, p[0])) * k), y0 + int(max(0, min(sh, p[1])) * k))
+
+    cx, cy = at(gm["cursor"])
+    cv2.circle(frame, (cx, cy), max(2, int(gm["radius"] * k)), (110, 110, 110), 1, cv2.LINE_AA)
+    for p in gm["trail"][:-1]:
+        cv2.circle(frame, at(p), 2, (160, 90, 140), -1)
+    if gm["gaze"] is not None:
+        cv2.circle(frame, at(gm["gaze"]), 7, (255, 100, 220), -1, cv2.LINE_AA)
+    cv2.circle(frame, (cx, cy), 5, (80, 230, 80), 2, cv2.LINE_AA)
+    if gm.get("flash"):
+        cv2.circle(frame, at(gm["flash"]), 13, (0, 220, 255), 2, cv2.LINE_AA)
+    _text(frame, "screen: gaze=pink  cursor=green" + ("" if gm["enabled"] else "  (jump OFF)"), x0 - 40, y0 + mh + 16, (255, 255, 255), 0.4)
+
+
 def draw_hud(frame, info, fps, face_found):
     """info = controller.hud_info(): {"mode": str, "lines": [str], "bars": [(label, 0..1, BGR)]}"""
     h, w = frame.shape[:2]
@@ -55,6 +85,9 @@ def draw_hud(frame, info, fps, face_found):
     if len(trace) > 2:                                # grey = raw, green = smoothed
         _plot(frame, "head x", [t[0] for t in trace], [t[1] for t in trace], w - 160, 42)
         _plot(frame, "head y", [t[2] for t in trace], [t[3] for t in trace], w - 160, 92)
+
+    if info.get("gaze_map"):
+        draw_gaze_map(frame, info["gaze_map"])
 
     y = h - 12 - 20 * (len(info["lines"]) + len(info["bars"]))
     for line in info["lines"]:                       # raw numbers, for tuning
