@@ -79,10 +79,23 @@ def main():
     actions.set_paused(True)  # start paused so nothing moves until you press ctrl+alt+p (or Start control)
     print("Started PAUSED. Press ctrl+alt+p (or click Start control in the Command Center) when you're ready.")
 
+    fps_box = [30.0]
+
     def calibrate():
         """Runs the dot screen. The mouse is never touched by it, and Nod's pause state is left alone."""
         print("Eye calibration: look at each dot until it moves. ESC cancels. (~35 seconds)")
-        new_mapper = run_calibration(camera, tracker, aspect, box["cfg"])
+        shown = [0.0]
+
+        def tick(step, total, text):
+            """Keeps the dashboard informed while this window has the main loop busy."""
+            if dash and time.monotonic() - shown[0] > 0.3:
+                shown[0] = time.monotonic()
+                snap = controller.snapshot()
+                snap.update(fps=round(fps_box[0], 1), perms=permissions.status(), busy=f"Calibrating eyes: {text}")
+                dash.publish(snap)
+
+        tick(0, 0, "starting")
+        new_mapper = run_calibration(camera, tracker, aspect, box["cfg"], on_tick=tick)
         if new_mapper:
             controller.set_gaze_mapper(new_mapper)
             print("Eye jump is now ON. Look at a far part of the screen and hold steady to jump.")
@@ -129,6 +142,7 @@ def main():
                 print("Failsafe triggered (mouse in the corner). Stopping.")
                 break
             fps = 0.9 * fps + 0.1 * (1.0 / max(now - last, 1e-6))
+            fps_box[0] = fps
             last = now
 
             # ---- the browser dashboard ----

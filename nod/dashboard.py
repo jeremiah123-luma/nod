@@ -174,7 +174,9 @@ def _make_handler(dash):
             seq = -1
             try:
                 while dash._server is not None:
-                    seq, payload = dash.wait_for_update(seq, 15)
+                    # Wakes on every new state, or every 2 s with the last one: a heartbeat, so the page can tell
+                    # "Nod is busy" (e.g. calibrating) apart from "Nod has stopped".
+                    seq, payload = dash.wait_for_update(seq, 2)
                     if dash._server is None:
                         break
                     self.wfile.write(b"data: " + payload + b"\n\n")

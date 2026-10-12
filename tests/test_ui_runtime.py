@@ -161,3 +161,58 @@ class StaticAssetTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CalibrationScreenTests(unittest.TestCase):
+    def test_dot_screen_and_cards_draw_at_any_screen_size(self):
+        from nod.gaze_calibration import _card, _draw
+        for size in ((1512, 982), (1920, 1080), (800, 600)):
+            img = _draw(size, (size[0] * 0.9, size[1] * 0.1), 0.5, True, "Look at the dot", 7, 18, face_ok=False)
+            self.assertEqual(img.shape, (size[1], size[0], 3))
+            self.assertGreater(img.sum(), 0)
+            self.assertEqual(_card(size, "Good", ["a", "b"]).shape, (size[1], size[0], 3))
+
+    def test_old_call_signature_still_works(self):
+        from nod.gaze_calibration import _draw
+        self.assertEqual(_draw((800, 600), (400, 300), 0.5, True, "hello").shape, (600, 800, 3))
+
+    def test_on_tick_reports_progress(self):
+        src = (Path(__file__).resolve().parent.parent / "nod" / "gaze_calibration.py").read_text()
+        self.assertIn("on_tick(n, len(plan)", src)
+
+
+class DashboardBusyAndSafetyTests(unittest.TestCase):
+    def setUp(self):
+        self.html = (UI / "index.html").read_text()
+
+    def test_page_handles_busy_state_and_shows_the_emergency_stop(self):
+        self.assertIn('id="busy"', self.html)
+        self.assertIn("s.busy", self.html)
+        self.assertIn("top-left corner", self.html)
+
+    def test_pulse_respects_reduced_motion_globally(self):
+        self.assertIn("prefers-reduced-motion", self.html)
+        self.assertIn(".tile.pulse", self.html)
+
+
+class HeartbeatTests(unittest.TestCase):
+    def test_stream_repeats_the_last_state_so_the_page_knows_nod_is_alive(self):
+        import http.client
+        from nod.dashboard import Dashboard
+        dash = Dashboard(lambda: load_config(), lambda a: {}, lambda c: None, port=0)
+        dash.start()
+        try:
+            dash.publish({"busy": "Calibrating eyes: 3/18"})
+            conn = http.client.HTTPConnection("127.0.0.1", dash.port, timeout=6)
+            conn.request("GET", f"/events?t={dash.token}", headers={"Host": f"127.0.0.1:{dash.port}"})
+            r = conn.getresponse()
+            lines = []
+            while len(lines) < 2:                      # two data events with no new publish in between
+                line = r.fp.readline().decode().strip()
+                if line.startswith("data:"):
+                    lines.append(line)
+            self.assertEqual(lines[0], lines[1])
+            self.assertIn("Calibrating", lines[0])
+            conn.close()
+        finally:
+            dash.stop()

@@ -183,10 +183,16 @@ input[type=range]:focus-visible { outline-offset: 4px; }
 
 /* ---------- misc ---------- */
 .offline { position: sticky; top: 8px; z-index: 20; max-width: 1280px; margin: 0 auto 12px; padding: 12px 16px; background: #1a0b05; border: 1px solid var(--accent-dim); border-radius: 12px; color: var(--text); }
+.busy { border-color: var(--accent); background: var(--accent-soft); }
 .offline code { font: 12px var(--mono); color: var(--accent); }
 #toast { position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 20px); background: var(--text); color: #000; padding: 10px 16px; border-radius: 999px; font-weight: 600; opacity: 0; pointer-events: none; transition: .2s; z-index: 30; max-width: 90vw; }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 #toast.err { background: var(--bad); color: #fff; }
+.safety { display: flex; gap: 8px; align-items: flex-start; margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.safety svg { flex: none; margin-top: 2px; color: var(--accent); }
+.safety b { color: var(--text); }
+.tile.pulse { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 36px rgba(245, 74, 0, .22); }
+.tile { transition: border-color .35s, box-shadow .35s; }
 .privacy { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 12px; margin-top: 10px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 [hidden] { display: none !important; }
@@ -196,6 +202,8 @@ input[type=range]:focus-visible { outline-offset: 4px; }
 <div id="offline" class="offline" role="status" hidden>
   <b>Nod isn't connected.</b> Start it in Terminal with <code>cd ~/nod &amp;&amp; .venv/bin/python -m nod.main</code> &mdash; this page reconnects by itself.
 </div>
+
+<div id="busy" class="offline busy" role="status" hidden></div>
 
 <header class="top">
   <div class="brand"><span class="wm">NO<b>D</b></span><span class="sub">Command Center</span></div>
@@ -241,6 +249,7 @@ input[type=range]:focus-visible { outline-offset: 4px; }
     <label class="switch"><span><span class="t">Dwell click</span><br><span class="d">Hold still to click</span></span>
       <input class="sw" type="checkbox" id="sw-dwell" role="switch"></label>
     <div class="keys" id="keys"></div>
+    <p class="safety"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.2 7.9-8 9-4.8-1.1-8-4.5-8-9V6z"/></svg><span><b>Emergency stop:</b> slam your real mouse into the top-left corner of the screen.</span></p>
   </section>
 
   <!-- SETUP -->
@@ -467,6 +476,15 @@ function renderLog(entries) {
 
 function render(s) {
   state = s;
+  // busy banner (e.g. while the eye-calibration screen has Nod's attention)
+  $("busy").hidden = !s.busy;
+  if (s.busy) $("busy").textContent = s.busy + " — look at the dots on your screen. ESC cancels.";
+  // a quick orange pulse when something happens (click, jump, mode change)
+  const last = (s.log || [])[(s.log || []).length - 1];
+  if (last && render.lastLog !== last.t) {
+    if (render.lastLog !== undefined && ["click", "jump", "mode"].includes(last.kind)) { const hero = $("t-mode"); hero.classList.add("pulse"); clearTimeout(render.pt); render.pt = setTimeout(() => hero.classList.remove("pulse"), 450); }
+    render.lastLog = last.t;
+  } else if (!last && render.lastLog === undefined) { render.lastLog = null; }
   // header pills
   const live = $("pill-live"); live.className = "pill " + (s.paused ? "warn" : "ok"); $("pill-live-t").textContent = s.paused ? "Paused" : "Live";
   $("pill-face").className = "pill " + (s.face ? "ok" : "bad"); $("pill-face-t").textContent = s.face ? "Face found" : "No face";
@@ -595,6 +613,7 @@ setInterval(() => { if (lastMsg && performance.now() - lastMsg > 3500) $("offlin
   meta.settings.forEach((s) => { settingsByKey[s.key] = s; initialValues[s.key] = s.value; });
   $("keys").textContent = "";
   const labels = { pause: "Pause / resume", recenter: "Recenter", calibrate: "Calibrate eyes", gaze_toggle: "Eye jump on/off", dwell_toggle: "Dwell click", voice_toggle: "Voice", quit: "Quit" };
+  { const kb = document.createElement("kbd"); kb.textContent = "Space"; const sp = document.createElement("span"); sp.textContent = "Start / pause (when this page is focused)"; $("keys").append(kb, sp); }
   Object.entries(meta.hotkeys).forEach(([k, v]) => { if (!labels[k]) return; const kb = document.createElement("kbd"); kb.textContent = prettyKey(v); const sp = document.createElement("span"); sp.textContent = labels[k]; $("keys").append(kb, sp); });
   buildTuning(); connect(); requestAnimationFrame(frame);
 })();

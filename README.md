@@ -23,7 +23,23 @@ cd ~/nod
 .venv/bin/python -m nod.main --dry-run     # safe: prints what it WOULD do, never touches the mouse
 .venv/bin/python -m nod.main               # the real thing
 ```
-Nod **starts paused**. Press **ctrl+alt+p** when you're ready.
+Nod **starts paused**. Press **ctrl+alt+p** (or click **Start control** in the Command Center) when you're ready.
+
+## The Command Center (your control panel)
+When Nod starts it opens **http://127.0.0.1:8765/** in your browser. It shows, live:
+- the **mode** (POINT / SCROLL / PAUSED) and a cheat sheet of what each gesture does
+- a **setup checklist** that also checks the macOS permissions for you
+- big **Start / Pause**, **Recenter**, **Calibrate eyes** buttons and switches for eye jump and dwell click
+- **head graphs** (grey = raw/jittery, orange = smoothed), **gesture meters** that say *why* a gesture did or didn't fire, the **eye-jump screen map**, a **face wireframe**, and an **activity feed**
+- **tuning sliders** for the settings you'll touch most. Changes apply instantly and are saved to `config.json`.
+
+Only numbers and a point-wireframe of your face are shown. Camera pictures are never sent anywhere, and the page only listens on your own computer (127.0.0.1).
+
+**Preview it with no camera and no mouse:** `.venv/bin/python -m nod.demo`
+
+**Use it like an app:** open the page in Safari, then *File → Add to Dock*.
+
+Options: `--no-dashboard` (don't start it), `--no-open` (start it but don't open the browser). In `config.json`, the `ui` section turns the dashboard, auto-open, and the small camera preview window on or off.
 
 ## Controls
 | Keys (work from any app) | What |
