@@ -1,6 +1,31 @@
+# environment / secrets
 .venv/
-models/
+.env
+.env.*
+*.env
+.dev.vars
+
+# python
 __pycache__/
 *.pyc
+.pytest_cache/
+
+# editors / OS
 .DS_Store
+.idea/
+.vscode/
+
+# the MediaPipe model (download it, see README)
+models/
+
+# anything with a real face in it: calibration data, recorded frames, clips
 gaze_calibration.json
+*calibration*.json
+frames/
+recordings/
+captures/
+*.mp4
+*.mov
+*.avi
+*.jpg
+*.jpeg
