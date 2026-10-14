@@ -15,8 +15,8 @@ Most of us never think twice about using a mouse, but for a lot of people it isn
 ## How it works
 
 1. **Face tracking.** [MediaPipe Face Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker) runs on each webcam frame and returns 478 face landmarks plus blendshapes (named face expressions like `jawOpen` and `browInnerUp`). `nod/face.py`
-2. **Head pointer.** Nod measures where the nose tip sits relative to the line between the eyes. That ratio doesn't change with distance from the camera or head roll, and it doesn't move when you open your mouth. Head movement drives the cursor like a trackpad (relative movement times a gain), smoothed by a [One Euro filter](https://gery.casiez.net/1euro/) and a lock-and-release deadzone. `nod/pointer.py`, `nod/filters.py`
-3. **Gestures.** A mouth-open gesture held for a short time clicks once (with hysteresis and a cooldown so a yawn can't double-click). An eyebrow raise toggles scroll mode, where tilting the head scrolls instead of moving the cursor. Mouth pucker is an alternate toggle if eyebrows misfire. `nod/gestures.py`, `nod/controller.py`
+2. **Head pointer.** Nod measures where the nose tip sits relative to the line between the eyes. That ratio is designed to stay stable across distance from the camera and head roll. Head movement drives the cursor like a trackpad (relative movement times a gain), smoothed by a [One Euro filter](https://gery.casiez.net/1euro/) and a lock-and-release deadzone. `nod/pointer.py`, `nod/filters.py`
+3. **Gestures (coded, being tested).** A mouth-open gesture held for a short time clicks once (with hysteresis and a cooldown so a yawn can't double-click). An eyebrow raise toggles scroll mode, where tilting the head scrolls instead of moving the cursor. Mouth pucker is an alternate toggle if eyebrows misfire. `nod/gestures.py`, `nod/controller.py`
 4. **Actions and safety.** `nod/actions.py` is the only file that touches the mouse (via PyAutoGUI). The app starts paused, a global hotkey pauses it from any app, and paused means zero mouse actions. `nod/hotkeys.py`
 5. **Feedback.** A preview window shows the face mesh, the current mode (POINT / SCROLL / PAUSED), and click progress. A local browser dashboard (127.0.0.1 only, token protected) shows raw vs smoothed head signals, gesture meters that explain why a gesture did or didn't fire, and sliders for every tunable number. `nod/hud.py`, `nod/dashboard.py`, `nod/ui/`
 
@@ -38,7 +38,7 @@ Every threshold, gain, and hold time lives in `config.json`, not in code, so tun
 - **pynput** for global hotkeys
 - **faster-whisper** and **sounddevice** for the local voice-command prototype (off by default)
 - Standard library only for the dashboard server; the dashboard page loads no CDNs or external fonts
-- `unittest` for the test suite (244 tests, all run with fake landmark data, so no camera or mouse is needed)
+- `unittest` for the test suite (244 unit tests that run on recorded/fake landmark data, so no camera or mouse is needed)
 
 Built with Claude Code as a pair programmer. `CLAUDE.md` holds the design decisions and milestone rules I gave it.
 
