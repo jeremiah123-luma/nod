@@ -15,7 +15,7 @@ Most of us never think twice about using a mouse, but for a lot of people it isn
 ## How it works
 
 1. **Face tracking.** [MediaPipe Face Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker) runs on each webcam frame and returns 478 face landmarks plus blendshapes (named face expressions like `jawOpen` and `browInnerUp`). `nod/face.py`
-2. **Head pointer.** Nod measures where the nose tip sits relative to the line between the eyes. That ratio is designed to stay stable across distance from the camera and head roll. Head movement drives the cursor like a trackpad (relative movement times a gain), smoothed by a [One Euro filter](https://gery.casiez.net/1euro/) and a lock-and-release deadzone. `nod/pointer.py`, `nod/filters.py`
+2. **Head pointer.** Nod reads head turn and tilt from MediaPipe's face transformation matrix, a 3D fit of the whole face that is much steadier than any single landmark. (The nose-tip-to-eye-line ratio is kept as a fallback setting.) Head movement drives the cursor like a trackpad (relative movement times a gain), smoothed by a [One Euro filter](https://gery.casiez.net/1euro/) and a lock-and-release deadzone. `nod/pointer.py`, `nod/filters.py`
 3. **Gestures (coded, being tested).** A mouth-open gesture held for a short time clicks once (with hysteresis and a cooldown so a yawn can't double-click). An eyebrow raise toggles scroll mode, where tilting the head scrolls instead of moving the cursor. Mouth pucker is an alternate toggle if eyebrows misfire. `nod/gestures.py`, `nod/controller.py`
 4. **Actions and safety.** `nod/actions.py` is the only file that touches the mouse (via PyAutoGUI). The app starts paused, a global hotkey pauses it from any app, and paused means zero mouse actions. `nod/hotkeys.py`
 5. **Feedback.** A preview window shows the face mesh, the current mode (POINT / SCROLL / PAUSED), and click progress. A local browser dashboard (127.0.0.1 only, token protected) shows raw vs smoothed head signals, gesture meters that explain why a gesture did or didn't fire, and sliders for every tunable number. `nod/hud.py`, `nod/dashboard.py`, `nod/ui/`
@@ -27,7 +27,7 @@ Every threshold, gain, and hold time lives in `config.json`, not in code, so tun
 - **Pointer jitter.** MediaPipe landmarks wobble by a pixel or two every frame even when your head is still, and a gain of 60 to 70 turns that into a cursor that never settles. The One Euro filter alone wasn't enough. The fix in `pointer.py` is a lock-and-release deadzone: once the head has stayed inside a small circle for 300 ms the cursor locks and doesn't move at all, and it only releases when the head travels a deliberate distance. Jitter stays inside the circle; a real move leaves it immediately. Still being tuned on a real face (see roadmap).
 - **Raising your eyebrows moves your head.** The scroll toggle was firing when I tilted my head up, because tilting up also lifts the brows. The toggle now only counts when the head is level, still, and has been steady for a moment (`controller.py`).
 - **Opening your mouth moves your head too.** A mouth-open click nudges the cursor off the target right as it clicks. That is why the next milestone switches the click gesture to tongue-out, with mouth-open kept as a backup setting.
-- **Webcam eye tracking is rough.** A gaze-based cursor jump is in the code behind a toggle, with a dot calibration screen that reports its own error, but webcam gaze is only accurate to roughly which part of the screen. It is being rethought rather than promised.
+- **Webcam eye tracking is rough.** A gaze-based cursor jump is in the code (`ctrl+alt+g` turns it off; it only runs after calibration), with a dot calibration screen that reports its own error, but webcam gaze is only accurate to roughly which part of the screen. It is being rethought rather than promised.
 
 ## Tech stack
 
@@ -36,7 +36,7 @@ Every threshold, gain, and hold time lives in `config.json`, not in code, so tun
 - **OpenCV** for webcam capture and the preview window
 - **PyAutoGUI** to move, click, and scroll
 - **pynput** for global hotkeys
-- **faster-whisper** and **sounddevice** for the local voice-command prototype (off by default)
+- **faster-whisper** and **sounddevice** for the local voice-command prototype (off by default; the speech model downloads once, and audio never leaves the Mac)
 - Standard library only for the dashboard server; the dashboard page loads no CDNs or external fonts
 - `unittest` for the test suite (244 unit tests that run on recorded/fake landmark data, so no camera or mouse is needed)
 
@@ -76,13 +76,16 @@ If the cursor does nothing, it is almost always Accessibility. If the hotkeys do
 .venv/bin/python -m unittest discover -s tests -t .   # tests
 ```
 
-Nod starts paused. Press `ctrl+alt+p` (or Start control in the dashboard) when you're ready.
+Nod starts paused. Press `ctrl+alt+p`, or the **Start control** button in the dashboard, when you're ready.
 
 | Hotkey (works from any app) | What |
 |---|---|
 | `ctrl+alt+p` | pause / resume (paused = zero mouse actions) |
 | `ctrl+alt+c` | recenter: re-learn your relaxed face and level head |
-| `ctrl+alt+d` | dwell click on / off |
+| `ctrl+alt+d` | dwell click on / off (hold the cursor still to click) |
+| `ctrl+alt+g` | eye jump on / off (experimental) |
+| `ctrl+alt+k` | calibrate eyes (experimental) |
+| `ctrl+alt+v` | voice commands on / off (experimental) |
 | `ctrl+alt+q` | quit |
 
 Emergency stop: slam the real mouse into the top-left corner of the screen (PyAutoGUI's failsafe).

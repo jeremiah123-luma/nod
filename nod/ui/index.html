@@ -429,7 +429,7 @@ const MODE_TEXT = {
 function setNote(el, label, text) {              // bold label + plain text, built with textContent (never innerHTML)
   el.textContent = "";
   const b = document.createElement("b"); b.textContent = label;
-  el.append(b, document.createTextNode(text ? " — " + text : ""));
+  el.append(b, document.createTextNode(text ? ": " + text : ""));
 }
 function setMeter(fillId, value, marks) {
   $(fillId).style.width = clamp(value, 0, 1) * 100 + "%";
@@ -478,7 +478,7 @@ function render(s) {
   state = s;
   // busy banner (e.g. while the eye-calibration screen has Nod's attention)
   $("busy").hidden = !s.busy;
-  if (s.busy) $("busy").textContent = s.busy + " — look at the dots on your screen. ESC cancels.";
+  if (s.busy) $("busy").textContent = s.busy + ": look at the dots on your screen. ESC cancels.";
   // a quick orange pulse when something happens (click, jump, mode change)
   const last = (s.log || [])[(s.log || []).length - 1];
   if (last && render.lastLog !== last.t) {
@@ -535,7 +535,7 @@ function render(s) {
   if (gz.calibrated) {
     setNote($("gz-status"), gz.status.startsWith("JUMPED") ? "Jumped" : "Status", gz.status);
     $("gz-prog").style.width = gz.progress * 100 + "%";
-    const pct = gz.error_pct, v = pct <= 8 ? "Good" : pct <= 13 ? "OK" : "Poor — recalibrate for better jumps";
+    const pct = gz.error_pct, v = pct <= 8 ? "Good" : pct <= 13 ? "OK" : "Poor, recalibrate for better jumps";
     $("gz-quality").textContent = `Calibration: ${v} · ~${gz.error_pct}% error · ${gz.model}`;
   }
 
