@@ -29,3 +29,6 @@ captures/
 *.avi
 *.jpg
 *.jpeg
+
+# Claude Code instructions stay on this Mac, never on GitHub
+CLAUDE.md

@@ -40,7 +40,7 @@ Every threshold, gain, and hold time lives in `config.json`, not in code, so tun
 - Standard library only for the dashboard server; the dashboard page loads no CDNs or external fonts
 - `unittest` for the test suite (244 unit tests that run on recorded/fake landmark data, so no camera or mouse is needed)
 
-Built with Claude Code as a pair programmer. `CLAUDE.md` holds the design decisions and milestone rules I gave it.
+Built with Claude Code as a pair programmer.
 
 ## Run it
 
