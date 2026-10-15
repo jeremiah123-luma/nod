@@ -1,4 +1,4 @@
-"""Preview the Command Center without a camera or a mouse:  .venv/bin/python -m nod.demo
+"""Preview the dashboard without a camera or a mouse:  .venv/bin/python -m nod.demo
 
 Runs the real controller on invented, animated face data, and shows it on the real dashboard.
 It NEVER touches your mouse, camera, or config.json (settings changes go to a throwaway file).

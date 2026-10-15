@@ -1,6 +1,6 @@
 """The preview window: face mesh + mode banner + progress bars + raw numbers for tuning.
 
-Styled to match the browser Command Center: black panels, off-white text, one orange accent.
+Styled to match the browser dashboard: black panels, off-white text, one orange accent.
 (OpenCV colours are BGR, so orange #F54A00 is written (0, 74, 245).)
 """
 import cv2

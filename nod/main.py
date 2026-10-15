@@ -1,7 +1,7 @@
 """Nod: hands-free computer control. Run with:  .venv/bin/python -m nod.main
 
 Add --dry-run to print what the mouse WOULD do without touching it.
-Add --no-dashboard to skip the browser Command Center, --no-open to not open the browser automatically.
+Add --no-dashboard to skip the browser dashboard, --no-open to not open the browser automatically.
 Global hotkeys (work from any app): ctrl+alt+p pause/resume, ctrl+alt+c recenter, ctrl+alt+d dwell click on/off,
 ctrl+alt+g eye jump on/off, ctrl+alt+k calibrate eye jump, ctrl+alt+v voice (if enabled), ctrl+alt+q quit.
 """
@@ -34,8 +34,8 @@ def _gaze_label(state):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true", help="print mouse actions instead of doing them")
-    parser.add_argument("--no-dashboard", action="store_true", help="don't start the browser Command Center")
-    parser.add_argument("--no-open", action="store_true", help="start the Command Center but don't open the browser")
+    parser.add_argument("--no-dashboard", action="store_true", help="don't start the browser dashboard")
+    parser.add_argument("--no-open", action="store_true", help="start the dashboard but don't open the browser")
     args = parser.parse_args()
 
     cfg = load_config()
@@ -65,7 +65,7 @@ def main():
             dash = Dashboard(lambda: box["cfg"], bridge.on_command, bridge.on_settings,
                              meta_extra=lambda: {"mesh": mesh.meta()}, port=cfg["ui"]["port"])
             url = dash.start()
-            print(f"Command Center: {url}")
+            print(f"Dashboard: {url}")
             if cfg["ui"]["auto_open"] and not args.no_open:
                 webbrowser.open(url)
         except OSError as e:
@@ -77,7 +77,7 @@ def main():
     print("Nod is running. ctrl+alt+p = pause/resume, ctrl+alt+c = recenter, ctrl+alt+q = quit.")
     print("Emergency stop: slam the real mouse into the top-left corner of the screen.")
     actions.set_paused(True)  # start paused so nothing moves until you press ctrl+alt+p (or Start control)
-    print("Started PAUSED. Press ctrl+alt+p (or click Start control in the Command Center) when you're ready.")
+    print("Started PAUSED. Press ctrl+alt+p (or click Start control in the dashboard) when you're ready.")
 
     fps_box = [30.0]
 

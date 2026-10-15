@@ -1,4 +1,4 @@
-"""The Nod Command Center: a local dashboard in your browser.
+"""The Nod dashboard: a local dashboard in your browser.
 
 - Standard library only (no new dependencies). Listens on 127.0.0.1 ONLY, so nothing else on your
   network can reach it.

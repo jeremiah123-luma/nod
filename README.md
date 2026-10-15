@@ -4,9 +4,9 @@
 
 Nod is a macOS app that turns an ordinary webcam into a hands-free mouse. It is for people with motor disabilities, and for anyone who can't or doesn't want to use their hands in the moment. No extra hardware: head movement steers the cursor and a simple face gesture clicks. Everything runs locally on the Mac. Camera frames are never saved or sent anywhere.
 
-> Screenshot / GIF coming soon.
->
-> ![Nod demo placeholder](docs/demo.gif)
+<img src="docs/dashboard.png" alt="Nod's local dashboard in demo mode: paused, with setup checks, controls, hotkeys, and live head pointer and face gesture readouts">
+
+<sub>The dashboard running in demo mode (`python -m nod.demo`) on invented face data, with no camera.</sub>
 
 ## Why I built this
 
