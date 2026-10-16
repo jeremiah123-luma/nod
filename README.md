@@ -2,7 +2,7 @@
 
 **🚧 In development.** The head pointer works on a real webcam and is being tuned for jitter. Everything past that is coded and unit tested but not yet proven on a real face. See the [roadmap](#roadmap).
 
-Nod is a macOS app that turns an ordinary webcam into a hands-free mouse. It is for people with motor disabilities, and for anyone who can't or doesn't want to use their hands in the moment. No extra hardware: head movement steers the cursor and a simple face gesture clicks. Everything runs locally on the Mac. Camera frames are never saved or sent anywhere.
+Nod is a macOS app that turns an ordinary webcam into a hands-free mouse. It is for people with motor disabilities, and for anyone who can't or doesn't want to use their hands in the moment. No extra hardware: head movement steers the cursor, and clicking with a simple face gesture is in development. Everything runs locally on the Mac. Camera frames are never saved or sent anywhere.
 
 <img src="docs/dashboard.png" alt="Nod's local dashboard in demo mode: paused, with setup checks, controls, hotkeys, and live head pointer and face gesture readouts">
 
@@ -10,7 +10,7 @@ Nod is a macOS app that turns an ordinary webcam into a hands-free mouse. It is 
 
 ## Why I built this
 
-Most of us never think twice about using a mouse, but for a lot of people it isn't that simple. Some people can't use their hands at all, and some of us just can't, or don't want to, in the moment, like at the end of a long night when you're too tired to even reach for the trackpad. I wanted to build something for both of them: an app that turns the webcam you already have into a mouse, so you can move the cursor with your head and click with a simple face gesture, without buying any special hardware. That's what Nod is.
+Most of us never think twice about using a mouse, but for a lot of people it isn't that simple. Some people can't use their hands at all, and some of us just can't, or don't want to, in the moment, like at the end of a long night when you're too tired to even reach for the trackpad. I wanted to build something for both of them: an app that turns the webcam you already have into a mouse, so you can move the cursor with your head and, once it's ready, click with a simple face gesture, without buying any special hardware. That's what Nod is.
 
 ## How it works
 
@@ -96,7 +96,7 @@ Emergency stop: slam the real mouse into the top-left corner of the screen (PyAu
 |---|---|---|
 | M0: face tracking + mesh preview | ✅ Done | Webcam preview with landmarks and FPS |
 | M1: head pointer | 🔧 In progress | Works on a real webcam. Fixing jitter: One Euro filter plus a lock-and-release deadzone, still tuning the numbers against a real face |
-| M2: click gesture | 🔧 In progress | Mouth-open click works but moves the head. Switching to tongue-out so clicking doesn't move the cursor; mouth-open stays as a backup setting. Tongue-out is not coded yet |
+| M2: click gesture | 🔧 In progress | Mouth-open click is coded; in live testing it moves the head. Switching to tongue-out so clicking doesn't move the cursor; mouth-open stays as a backup setting. Tongue-out is not coded yet |
 | M3: scroll mode | 🔧 In progress | Coded and unit tested, not yet verified live. Tilt head up/down to scroll, toggled by an eyebrow raise (or mouth pucker if eyebrows misfire), with the mode shown on screen |
 | Later: natural-language voice commands | 📋 Planned | e.g. "scroll up", "type Romans 12:2". A basic local voice prototype (faster-whisper, a few fixed commands) exists behind an off-by-default setting |
 | Under consideration: eye tracking | 🤔 Rethinking | Look at a far part of the screen and the cursor jumps there, then the head fine-aims. Coded with a calibration screen, but webcam eye tracking is imprecise, so it may not stay |
