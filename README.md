@@ -1,8 +1,8 @@
 # Nod
 
-**🚧 In development.** The head pointer works on a real webcam and is being tuned for jitter. Everything past that is coded and unit tested but not yet proven on a real face. See the [roadmap](#roadmap).
+**🚧 In development.** The head pointer works on a real webcam and is being tuned for jitter. Dwell click (hold the cursor still to click) and eye jump work too, and are still being tuned. Clicking and scrolling with face gestures are coded and unit tested but not yet proven on a real face. See the [roadmap](#roadmap).
 
-Nod is a macOS app that turns an ordinary webcam into a hands-free mouse. It is for people with motor disabilities, and for anyone who can't or doesn't want to use their hands in the moment. No extra hardware: head movement steers the cursor, and clicking with a simple face gesture is in development. Everything runs locally on the Mac. Camera frames are never saved or sent anywhere.
+Nod is a macOS app that turns an ordinary webcam into a hands-free mouse. It is for people with motor disabilities, and for anyone who can't or doesn't want to use their hands in the moment. No extra hardware: head movement steers the cursor, dwell clicking works (hold the cursor still on something to click it), and clicking with a simple face gesture is in development. Everything runs locally on the Mac. Camera frames are never saved or sent anywhere.
 
 <img src="docs/dashboard.png" alt="Nod's local dashboard in demo mode: paused, with setup checks, controls, hotkeys, and live head pointer and face gesture readouts">
 
@@ -82,8 +82,8 @@ Nod starts paused. Press `ctrl+alt+p`, or the **Start control** button in the da
 |---|---|
 | `ctrl+alt+p` | pause / resume (paused = zero mouse actions) |
 | `ctrl+alt+c` | recenter: re-learn your relaxed face and level head |
-| `ctrl+alt+d` | dwell click on / off (hold the cursor still to click) |
-| `ctrl+alt+g` | eye jump on / off (experimental) |
+| `ctrl+alt+d` | dwell click on / off (hold the cursor still to click; works, still being tuned) |
+| `ctrl+alt+g` | eye jump on / off (works, still being tuned) |
 | `ctrl+alt+k` | calibrate eyes (experimental) |
 | `ctrl+alt+v` | voice commands on / off (experimental) |
 | `ctrl+alt+q` | quit |
